@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── PRODUTOS ────────────────────────────────────────────────
+model Produto {
+  id                  String     @id @default(cuid())
+  skuPrincipal        String     @unique
+  nome                String
+  categoria           String     @default("Geral")
+  unidadeCompra       String     @default("kg") // kg | unidade | pote | caixa | pacote
+  custoPorKg          Float?     // custo por kg (produtos fracionados)
+  custoUnitario       Float?     // custo por unidade (produtos fechados)
+  custoAtualizado     Float?     // último custo registrado — atualizado via compras
+  dataUltimaCompra    DateTime?
+  fornecedorPrincipal String?
+  tipoPrecificacao    String     @default("peso_proporcional") // peso_proporcional | custo_fixo
+  status              String     @default("ativo") // ativo | inativo
+  observacoes         String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  variacoes  Variacao[]
+  compras    Compra[]
+}
+
+// ─── VARIAÇÕES ───────────────────────────────────────────────
+model Variacao {
+  id              String   @id @default(cuid())
+  skuVariacao     String   @unique
+  skuPrincipal    String
+  produto         Produto  @relation(fields: [skuPrincipal], references: [skuPrincipal], onDelete: Cascade)
+  nomeVariacao    String
+  pesoGramas      Float?   // null para produtos por unidade
+  fatorConversao  Float?   // pesoGramas / 1000
+  custoCalculado  Float?   // custoPorKg × fatorConversao
+  custoAdicional  Float    @default(0)
+  custoTotal      Float?   // custoCalculado + custoAdicional
+  embalagem       String?
+  status          String   @default("ativo")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  precificacoes Precificacao[]
+}
+
+// ─── PLATAFORMAS ─────────────────────────────────────────────
+model Plataforma {
+  id              String   @id @default(cuid())
+  nome            String   @unique
+  slug            String   @unique // ml | shopee | tiktok | magalu
+  comissaoPct     Float    // ex: 0.14
+  taxaFixa        Float    @default(0)
+  custoFrete      Float    @default(0)
+  custoColeta     Float    @default(0)
+  impostoPct      Float    @default(0.08)
+  corHex          String   @default("#64748b")
+  ativa           Boolean  @default(true)
+  observacoes     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  precificacoes Precificacao[]
+}
+
+// ─── PRECIFICAÇÃO ────────────────────────────────────────────
+model Precificacao {
+  id               String     @id @default(cuid())
+  skuVariacao      String
+  variacao         Variacao   @relation(fields: [skuVariacao], references: [skuVariacao], onDelete: Cascade)
+  plataformaId     String
+  plataforma       Plataforma @relation(fields: [plataformaId], references: [id], onDelete: Cascade)
+
+  // Custos específicos desta linha
+  custoEmbalagem   Float      @default(0)
+  custoFrete       Float      @default(0)   // calculado automaticamente se ML
+  custoColeta      Float      @default(0)
+  comissaoPct      Float
+  impostoPct       Float      @default(0.08)
+
+  // Frete ML — tipo de envio (só relevante para plataforma ML)
+  tipoFreteML      String     @default("full") // full | flex | envios | fixo
+
+  // Preço praticado atualmente
+  precoAtual       Float?
+
+  // Calculados automaticamente
+  custoTotalCalc   Float?
+  lucroBruto       Float?
+  margemAtual      Float?
+  precoMinimo      Float?     // margem 20%
+  precoIdeal       Float?     // margem 25%
+  precoMaximo      Float?     // margem 30%
+  precoPromocional Float?     // precoIdeal × 1.45
+  statusMargem     String?    // SAUDAVEL | ATENCAO | PREJUIZO | SEM_PRECO
+
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([skuVariacao, plataformaId])
+}
+
+// ─── COMPRAS ─────────────────────────────────────────────────
+model Compra {
+  id               String   @id @default(cuid())
+  dataCompra       DateTime
+  skuPrincipal     String
+  produto          Produto  @relation(fields: [skuPrincipal], references: [skuPrincipal], onDelete: Cascade)
+  nomeProduto      String
+  fornecedor       String   @default("")
+  quantidade       Float
+  custoTotal       Float
+  frete            Float    @default(0)
+  outrosCustos     Float    @default(0)
+  custoUnitario    Float    // custoTotal / quantidade
+  custoAnterior    Float?
+  variacaoPct      Float?
+  statusVariacao   String?  // AUMENTOU > 5% | ESTAVEL ± 5% | DIMINUIU > 5%
+  precoVenda       Float?
+  impostoPct       Float    @default(0.0829)
+  margem           Float?
+  statusFinanceiro String?  // Lucro | Atenção | Prejuízo | Sem preço de venda
+  fonte            String   @default("manual") // manual | xlsx
+  createdAt        DateTime @default(now())
+}
+
+// ─── FORNECEDORES ────────────────────────────────────────────
+model Fornecedor {
+  id        String   @id @default(cuid())
+  nome      String   @unique
+  contato   String?
+  obs       String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
