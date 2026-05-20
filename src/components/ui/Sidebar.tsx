@@ -3,19 +3,26 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
-  ShoppingCart, Upload, Download, Search, ChevronRight, Zap, Truck
+  ShoppingCart, Upload, Download, Search, ChevronRight,
+  Zap, Truck, Megaphone, Settings, Calculator
 } from 'lucide-react'
 
 const links = [
-  { href: '/',             label: 'Dashboard',     icon: LayoutDashboard },
-  { href: '/busca',        label: 'Busca por SKU',  icon: Search },
-  { href: '/precificacao', label: 'Precificação',   icon: Tag },
-  { href: '/produtos',     label: 'Produtos',       icon: Package },
-  { href: '/variacoes',    label: 'Variações',      icon: Layers },
-  { href: '/plataformas',  label: 'Plataformas',    icon: Store },
-  { href: '/compras',      label: 'Compras',        icon: ShoppingCart },
-  { href: '/frete',        label: 'Frete ML',       icon: Truck },
-  { href: '/importar',     label: 'Importar XLSX',  icon: Upload },
+  { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
+  { href: '/busca',          label: 'Busca por SKU',   icon: Search },
+  { divider: true,           label: 'Precificação' },
+  { href: '/calculadora',    label: 'Calculadora',     icon: Calculator },
+  { href: '/anuncios',       label: 'Anúncios',        icon: Megaphone },
+  { href: '/precificacao',   label: 'Precificação',    icon: Tag },
+  { href: '/frete',          label: 'Frete ML',        icon: Truck },
+  { divider: true,           label: 'Cadastros' },
+  { href: '/produtos',       label: 'Produtos',        icon: Package },
+  { href: '/variacoes',      label: 'Variações',       icon: Layers },
+  { href: '/plataformas',    label: 'Plataformas',     icon: Store },
+  { divider: true,           label: 'Operacional' },
+  { href: '/compras',        label: 'Compras',         icon: ShoppingCart },
+  { href: '/importar',       label: 'Importar XLSX',   icon: Upload },
+  { href: '/configuracoes',  label: 'Configurações',   icon: Settings },
 ]
 
 export default function Sidebar() {
@@ -36,8 +43,16 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-3 px-2 space-y-0.5">
-        {links.map(({ href, label, icon: Icon }) => {
+      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        {links.map((item, i) => {
+          if ('divider' in item && item.divider) {
+            return (
+              <div key={i} className="pt-3 pb-1 px-3">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{item.label}</p>
+              </div>
+            )
+          }
+          const { href, label, icon: Icon } = item as { href: string; label: string; icon: React.ElementType }
           const active = path === href || (href !== '/' && path.startsWith(href))
           return (
             <Link key={href} href={href}
@@ -60,7 +75,7 @@ export default function Sidebar() {
         </a>
       </div>
       <div className="px-4 pb-3">
-        <p className="text-gray-600 text-[10px]">v1.0 · SQLite · Next.js 14</p>
+        <p className="text-gray-600 text-[10px]">v2.0 · SQLite · Next.js 14</p>
       </div>
     </aside>
   )
