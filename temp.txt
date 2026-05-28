@@ -26,7 +26,6 @@ model Produto {
   updatedAt           DateTime   @updatedAt
 
   variacoes  Variacao[]
-  aliases    FornecedorAlias[]
   compras    Compra[]
 }
 
@@ -185,35 +184,6 @@ model Configuracao {
   updatedAt DateTime @updatedAt
 }
 
-// ─── KITS ────────────────────────────────────────────────────
-model Kit {
-  id              String         @id @default(cuid())
-  skuKit          String         @unique  // ex: KIT0045
-  nome            String
-  categoria       String         @default("Kits")
-  custoTotal      Float?         // calculado automaticamente pela soma dos componentes
-  custoEmbalagem  Float          @default(0)
-  observacoes     String?
-  status          String         @default("ativo")
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  componentes     KitComponente[]
-}
-
-model KitComponente {
-  id              String   @id @default(cuid())
-  kitId           String
-  kit             Kit      @relation(fields: [kitId], references: [id], onDelete: Cascade)
-  skuProduto      String   // SKU do produto componente
-  nomeProduto     String   // nome snapshot para exibição
-  quantidadeGramas Float?  // em gramas (para produtos por kg)
-  quantidadeUn    Float?   // em unidades (para produtos por unidade)
-  custoUnitario   Float    // custo calculado deste componente no momento do cadastro
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
 // ─── FATURAMENTO DIÁRIO ──────────────────────────────────────
 model Faturamento {
   id             String   @id @default(cuid())
@@ -229,49 +199,3 @@ model Faturamento {
 
   @@unique([data, canal])
 }
-
-// --- ALIAS DE PRODUTO POR FORNECEDOR -----------------------------------------
-model FornecedorAlias {
-  id               String   @id @default(cuid())
-  skuPrincipal     String
-  produto          Produto  @relation(fields: [skuPrincipal], references: [skuPrincipal], onDelete: Cascade)
-  fornecedor       String
-  nomeNoFornecedor String
-  codigoFornecedor String?
-  embalagem        String?
-  ultimoPreco      Float?
-  dataUltimoPreco  DateTime?
-  ativo            Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  @@unique([fornecedor, nomeNoFornecedor])
-  @@index([skuPrincipal])
-  @@index([fornecedor])
-}
-
-// --- PEDIDO DE COMPRA --------------------------------------------
-model PedidoCompra {
-  id         String       @id @default(cuid())
-  fornecedor String
-  status     String       @default("rascunho")
-  obs        String?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  itens      PedidoItem[]
-}
-
-model PedidoItem {
-  id               String       @id @default(cuid())
-  pedidoId         String
-  pedido           PedidoCompra @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
-  skuPrincipal     String
-  nomeProduto      String
-  nomeNoFornecedor String?
-  codigoFornecedor String?
-  quantidade       Float
-  unidade          String   @default("kg")
-  precoUnitario    Float?
-  obs              String?
-  createdAt        DateTime @default(now())
-}
-

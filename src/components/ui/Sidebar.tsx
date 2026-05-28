@@ -17,6 +17,7 @@ const links = [
   { href: '/frete',          label: 'Frete ML',        icon: Truck },
   { divider: true,           label: 'Cadastros' },
   { href: '/produtos',       label: 'Produtos',        icon: Package },
+  { href: '/kits',           label: 'Kits',            icon: Layers },
   { href: '/variacoes',      label: 'Variações',       icon: Layers },
   { href: '/plataformas',    label: 'Plataformas',     icon: Store },
   { divider: true,           label: 'Operacional' },

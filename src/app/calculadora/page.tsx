@@ -86,14 +86,43 @@ export default function CalculadoraPage() {
   const [error, setError]           = useState('')
   const timer = useRef<NodeJS.Timeout>()
 
-  // ── Buscar produto ────────────────────────────────────────
+  // ── Buscar produto ou kit ─────────────────────────────────
   const buscarProduto = useCallback(async (sku: string) => {
     if (sku.length < 2) { setProduto(null); setResultados([]); setCalculado(false); return }
     setLoading(true)
-    const r = await fetch(`/api/produtos/${encodeURIComponent(sku)}`)
-    if (r.ok) {
-      const p = await r.json()
+
+    // Tentar produto primeiro
+    const rProd = await fetch(`/api/produtos/${encodeURIComponent(sku)}`)
+    if (rProd.ok) {
+      const p = await rProd.json()
       setProduto(p)
+      setResultados([])
+      setCalculado(false)
+      setLoading(false)
+      return
+    }
+
+    // Se não encontrou produto, tentar kit
+    const rKit = await fetch(`/api/kits/${encodeURIComponent(sku)}`)
+    if (rKit.ok) {
+      const kit = await rKit.json()
+      // Converter kit para formato de produto com 1 variação
+      const kitComoProduto = {
+        skuPrincipal: kit.skuKit,
+        nome: kit.nome,
+        categoria: kit.categoria,
+        custoAtualizado: kit.custoTotal,
+        isKit: true,
+        variacoes: [{
+          skuVariacao: kit.skuKit + '-OKit',
+          nomeVariacao: kit.nome,
+          pesoGramas: null,
+          custoTotal: kit.custoTotal,
+          custoCalculado: kit.custoTotal,
+          status: 'ativo',
+        }],
+      }
+      setProduto(kitComoProduto as any)
       setResultados([])
       setCalculado(false)
     } else {
