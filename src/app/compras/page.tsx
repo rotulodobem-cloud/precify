@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus } from 'lucide-react'
+import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X } from 'lucide-react'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
 
 // ── Formatadores ─────────────────────────────────────────────
@@ -17,7 +17,7 @@ const num = (v?: number | null) =>
 const pct = (v?: number | null) => v != null ? `${(v * 100).toFixed(1)}%` : '—'
 const dt  = (d: string) => new Date(d).toLocaleDateString('pt-BR')
 
-type Aba = 'dashboard' | 'historico' | 'fornecedores' | 'ranking' | 'mensal' | 'melhor_preco'
+type Aba = 'dashboard' | 'historico' | 'fornecedores' | 'ranking' | 'mensal' | 'melhor_preco' | 'hist_mensal' | 'curva' | 'pedido' | 'aliases'
 
 interface Compra {
   id: string; dataCompra: string; skuPrincipal: string; nomeProduto: string; fornecedor: string
@@ -45,6 +45,43 @@ const emptyF = {
 
 const emptyForn = { nome: '', contato: '', obs: '' }
 
+
+// ── Tipos para lista de compras ───────────────────────────────
+interface HistoricoMensalItem {
+  skuPrincipal: string; nomeProduto: string; fornecedor: string
+  quantidade: number; custoUnitario: number; custoTotal: number
+  dataCompra: string; variacaoPct: number | null; custoAnterior: number | null
+  sugestao: string
+}
+interface HistoricoMensalData {
+  mes: string; totalGasto: number; totalItens: number
+  fornecedoresAtivos: number; comAumento: number; itens: HistoricoMensalItem[]
+}
+interface CurvaItem {
+  sku: string; produto: string; curva: 'A' | 'B' | 'C'
+  totalGasto: number; mediaGastoMes: number; qtdCompras: number
+  fornecedorPrincipal: string; outrosFornecedores: string[]; pctTotal: number
+}
+interface CurvaData {
+  periodo: string; totalGeral: number; qtdA: number; qtdB: number; qtdC: number; itens: CurvaItem[]
+}
+interface AliasItem {
+  id: string; skuPrincipal: string; fornecedor: string
+  nomeNoFornecedor: string; codigoFornecedor: string | null
+  embalagem: string | null; ultimoPreco: number | null; dataUltimoPreco: string | null
+  produto?: { nome: string }
+}
+interface PedidoItemLocal {
+  skuPrincipal: string; nomeProduto: string; nomeNoFornecedor?: string
+  codigoFornecedor?: string; quantidade: number; unidade: string
+  precoUnitario?: number; fornecedor: string
+}
+interface SugestaoForn {
+  ultimas2Compras: { fornecedor: string; custoUnitario: number; quantidade: number; dataCompra: string }[]
+  fornecedorSugerido: string | null; aliases: AliasItem[]
+  qtd30dias: number; ultimaQtd: number; sugestaoQtd: number
+}
+
 export default function ComprasPage() {
   const [aba, setAba]             = useState<Aba>('dashboard')
   const [compras, setCompras]     = useState<Compra[]>([])
@@ -69,6 +106,24 @@ export default function ComprasPage() {
 
   // SKU lookup
   const [skuLookup, setSkuLookup]   = useState<{ nome?: string; fornecedor?: string; custo?: number } | null>(null)
+
+  // ── Estado das novas abas ─────────────────────────────────
+  const [histMensal, setHistMensal]   = useState<HistoricoMensalData | null>(null)
+  const [curvaData, setCurvaData]     = useState<CurvaData | null>(null)
+  const [aliases, setAliases]         = useState<AliasItem[]>([])
+  const [pedido, setPedido]           = useState<PedidoItemLocal[]>([])
+  const [buscaPedido, setBuscaPedido] = useState('')
+  const [buscaRes, setBuscaRes]       = useState<{ sku: string; nome: string } | null>(null)
+  const [sugestao, setSugestao]       = useState<SugestaoForn | null>(null)
+  const [buscando, setBuscando]       = useState(false)
+  const [fornSel, setFornSel]         = useState('')
+  const [qtdInput, setQtdInput]       = useState('')
+  const [unidInput, setUnidInput]     = useState('kg')
+  const [mesesCurva, setMesesCurva]   = useState('3')
+  const [filtroCurva, setFiltroCurva] = useState<'todos'|'A'|'B'|'C'>('todos')
+  const [aliasForm, setAliasForm]     = useState({ skuPrincipal:'', fornecedor:'', nomeNoFornecedor:'', codigoFornecedor:'', embalagem:'', ultimoPreco:'' })
+  const [modalAlias, setModalAlias]   = useState(false)
+  const [loadingLista, setLoadingLista] = useState(false)
   const [skuLoading, setSkuLoading] = useState(false)
   const skuTimer = useRef<NodeJS.Timeout>()
 
@@ -152,16 +207,99 @@ export default function ComprasPage() {
     ? (parseFloat(form.custoTotal) / parseFloat(form.quantidade))
     : null
 
-  const abas: { id: Aba; label: string; icon: React.ElementType }[] = [
+  const abas: { id: Aba; label: string; icon: React.ElementType; grupo?: string }[] = [
     { id: 'dashboard',    label: 'Resumo',           icon: BarChart2 },
     { id: 'historico',    label: 'Histórico',         icon: ShoppingCart },
     { id: 'fornecedores', label: 'Por fornecedor',    icon: Users },
     { id: 'ranking',      label: 'Variação de preço', icon: TrendingUp },
     { id: 'mensal',       label: 'Volume mensal',     icon: Calendar },
     { id: 'melhor_preco', label: 'Melhor preço',      icon: Star },
+    { id: 'hist_mensal',  label: 'Histórico mensal',  icon: Calendar,  grupo: 'lista' },
+    { id: 'curva',        label: 'Curva A/B/C',       icon: BarChart2, grupo: 'lista' },
+    { id: 'pedido',       label: 'Montar pedido',     icon: ShoppingCart, grupo: 'lista' },
+    { id: 'aliases',      label: 'Nomes fornecedor',  icon: Package,   grupo: 'lista' },
   ]
 
   const limparFiltros = () => { setQ(''); setFornFiltro(''); setDataInicio(''); setDataFim('') }
+
+  const loadHistMensal = useCallback(async () => {
+    setLoadingLista(true)
+    const r = await fetch('/api/compras/lista?tipo=historico')
+    setHistMensal(await r.json())
+    setLoadingLista(false)
+  }, [])
+
+  const loadCurva = useCallback(async () => {
+    setLoadingLista(true)
+    const r = await fetch(`/api/compras/lista?tipo=curva&meses=${mesesCurva}`)
+    setCurvaData(await r.json())
+    setLoadingLista(false)
+  }, [mesesCurva])
+
+  const loadAliases = useCallback(async () => {
+    setLoadingLista(true)
+    const r = await fetch('/api/aliases')
+    setAliases(await r.json())
+    setLoadingLista(false)
+  }, [])
+
+  useEffect(() => {
+    if (aba === 'hist_mensal') loadHistMensal()
+    else if (aba === 'curva') loadCurva()
+    else if (aba === 'aliases') loadAliases()
+  }, [aba, loadHistMensal, loadCurva, loadAliases])
+
+  const buscarProduto = async () => {
+    if (!buscaPedido.trim()) return
+    setBuscando(true); setSugestao(null); setBuscaRes(null)
+    const r = await fetch(`/api/busca?q=${encodeURIComponent(buscaPedido)}`)
+    const data = await r.json()
+    if (!data.length) { setBuscando(false); return }
+    const prod = data[0]
+    setBuscaRes({ sku: prod.skuPrincipal, nome: prod.nome })
+    const s = await fetch(`/api/compras/lista?tipo=sugestao&sku=${prod.skuPrincipal}`)
+    const sData = await s.json()
+    setSugestao(sData)
+    setFornSel(sData.fornecedorSugerido || '')
+    setQtdInput(String(sData.sugestaoQtd || ''))
+    setBuscando(false)
+  }
+
+  const adicionarAoPedido = () => {
+    if (!buscaRes || !fornSel || !qtdInput) return
+    const alias = sugestao?.aliases.find(a => a.fornecedor === fornSel)
+    const item: PedidoItemLocal = {
+      skuPrincipal: buscaRes.sku, nomeProduto: buscaRes.nome,
+      nomeNoFornecedor: alias?.nomeNoFornecedor,
+      codigoFornecedor: alias?.codigoFornecedor || undefined,
+      quantidade: parseFloat(qtdInput), unidade: unidInput,
+      precoUnitario: alias?.ultimoPreco || sugestao?.ultimas2Compras[0]?.custoUnitario,
+      fornecedor: fornSel,
+    }
+    const idx = pedido.findIndex(p => p.skuPrincipal === item.skuPrincipal && p.fornecedor === item.fornecedor)
+    if (idx >= 0) { const n = [...pedido]; n[idx] = item; setPedido(n) }
+    else setPedido(p => [...p, item])
+    setBuscaPedido(''); setBuscaRes(null); setSugestao(null); setFornSel(''); setQtdInput('')
+  }
+
+  const exportarFornecedor = (forn: string, itens: PedidoItemLocal[]) => {
+    const data = new Date().toLocaleDateString('pt-BR')
+    let txt = `PEDIDO DE COMPRA — ${forn}\nData: ${data}\n${'─'.repeat(40)}\n\n`
+    itens.forEach(i => {
+      const nome = i.nomeNoFornecedor || i.nomeProduto
+      const cod = i.codigoFornecedor ? ` (cod. ${i.codigoFornecedor})` : ''
+      txt += `• ${nome}${cod}: ${i.quantidade} ${i.unidade}\n`
+    })
+    navigator.clipboard.writeText(txt)
+    alert('Lista copiada!')
+  }
+
+  const salvarAlias = async () => {
+    await fetch('/api/aliases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(aliasForm) })
+    setModalAlias(false)
+    setAliasForm({ skuPrincipal:'', fornecedor:'', nomeNoFornecedor:'', codigoFornecedor:'', embalagem:'', ultimoPreco:'' })
+    loadAliases()
+  }
 
   return (
     <div className="space-y-4">
@@ -183,10 +321,18 @@ export default function ComprasPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
-        {abas.map(({ id, label, icon: Icon }) => (
+        {abas.filter(a => !a.grupo).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setAba(id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
               ${aba === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Icon size={13} /> {label}
+          </button>
+        ))}
+        <div className="w-px bg-gray-300 mx-1 self-stretch" />
+        {abas.filter(a => a.grupo === 'lista').map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setAba(id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+              ${aba === id ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-700 hover:bg-emerald-50'}`}>
             <Icon size={13} /> {label}
           </button>
         ))}
@@ -498,6 +644,428 @@ export default function ComprasPage() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ── HISTÓRICO MENSAL ── */}
+      {aba === 'hist_mensal' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Histórico do mês anterior</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Base para planejar as compras do próximo mês</p>
+            </div>
+          </div>
+          {loadingLista ? <Loading /> : !histMensal ? (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
+              Carregando dados do mês anterior...
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: `Total comprado (${histMensal.mes})`, valor: brl(histMensal.totalGasto) },
+                  { label: 'Produtos diferentes', valor: String(histMensal.totalItens) },
+                  { label: 'Fornecedores ativos', valor: String(histMensal.fornecedoresAtivos) },
+                  { label: 'Com aumento de preço', valor: String(histMensal.comAumento), vermelho: histMensal.comAumento > 0 },
+                ].map(k => (
+                  <div key={k.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-1">{k.label}</div>
+                    <div className={`text-xl font-semibold ${k.vermelho ? 'text-red-600' : 'text-gray-900'}`}>{k.valor}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="th">Produto</th>
+                      <th className="th">Fornecedor</th>
+                      <th className="th text-right">Qtd</th>
+                      <th className="th text-right">Custo unit.</th>
+                      <th className="th text-right">Variação</th>
+                      <th className="th">Sugestão</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {histMensal.itens.map((item, i) => (
+                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <td className="td">
+                          <div className="font-medium text-gray-900">{item.nomeProduto}</div>
+                          <div className="text-xs text-gray-400">SKU {item.skuPrincipal}</div>
+                        </td>
+                        <td className="td">
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.fornecedor || '—'}</span>
+                        </td>
+                        <td className="td text-right text-gray-700">{item.quantidade} kg</td>
+                        <td className="td text-right text-gray-700">{brl(item.custoUnitario)}</td>
+                        <td className="td text-right">
+                          {item.variacaoPct != null ? (
+                            <span className={`text-xs font-medium ${item.variacaoPct > 0.05 ? 'text-red-600' : item.variacaoPct < -0.05 ? 'text-green-600' : 'text-gray-500'}`}>
+                              {item.variacaoPct > 0 ? '▲' : item.variacaoPct < 0 ? '▼' : '='} {pct(Math.abs(item.variacaoPct))}
+                            </span>
+                          ) : <span className="text-gray-300 text-xs">—</span>}
+                        </td>
+                        <td className="td">
+                          <div className="flex items-center gap-1.5">
+                            {item.sugestao === 'revisar_aumento' ? <TrendingUp size={13} className="text-red-500" /> :
+                             item.sugestao === 'oportunidade' ? <TrendingDown size={13} className="text-green-600" /> :
+                             <Minus size={13} className="text-gray-400" />}
+                            <span className="text-xs text-gray-600">
+                              {item.sugestao === 'revisar_aumento' ? 'Preço subiu — revisar' :
+                               item.sugestao === 'oportunidade' ? 'Preço caiu' : 'Manter quantidade'}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── CURVA ABC ── */}
+      {aba === 'curva' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Curva A/B/C</h2>
+              <p className="text-xs text-gray-500">Produtos classificados por volume de gasto</p>
+            </div>
+            <select value={mesesCurva} onChange={e => setMesesCurva(e.target.value)}
+              className="ml-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+              <option value="1">Último mês</option>
+              <option value="3">Últimos 3 meses</option>
+              <option value="6">Últimos 6 meses</option>
+            </select>
+            <div className="flex gap-1">
+              {(['todos','A','B','C'] as const).map(f => (
+                <button key={f} onClick={() => setFiltroCurva(f)}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    filtroCurva === f
+                      ? f === 'A' ? 'bg-blue-600 text-white border-blue-600'
+                        : f === 'B' ? 'bg-green-600 text-white border-green-600'
+                        : f === 'C' ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-gray-700 text-white border-gray-700'
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  {f === 'todos' ? 'Todos' : `Curva ${f}`}
+                </button>
+              ))}
+            </div>
+          </div>
+          {loadingLista ? <Loading /> : !curvaData ? null : (
+            <>
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: 'Total gasto', valor: brl(curvaData.totalGeral) },
+                  { label: 'Curva A (80% gasto)', valor: `${curvaData.qtdA} produtos`, cor: 'text-blue-600' },
+                  { label: 'Curva B', valor: `${curvaData.qtdB} produtos`, cor: 'text-green-600' },
+                  { label: 'Curva C', valor: `${curvaData.qtdC} produtos`, cor: 'text-amber-600' },
+                ].map(k => (
+                  <div key={k.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div className="text-xs text-gray-500 mb-1">{k.label}</div>
+                    <div className={`text-lg font-semibold ${k.cor || 'text-gray-900'}`}>{k.valor}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="th w-16">Curva</th>
+                      <th className="th">Produto</th>
+                      <th className="th text-right">Média/mês</th>
+                      <th className="th text-right">% do total</th>
+                      <th className="th">Fornecedor principal</th>
+                      <th className="th">Outros</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {curvaData.itens.filter(i => filtroCurva === 'todos' || i.curva === filtroCurva).map((item, i) => (
+                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <td className="td">
+                          <span className={`text-xs font-bold px-2 py-1 rounded ${
+                            item.curva === 'A' ? 'bg-blue-100 text-blue-700' :
+                            item.curva === 'B' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                          }`}>{item.curva}</span>
+                        </td>
+                        <td className="td">
+                          <div className="font-medium text-gray-900">{item.produto}</div>
+                          <div className="text-xs text-gray-400">SKU {item.sku}</div>
+                        </td>
+                        <td className="td text-right text-gray-700">{brl(item.mediaGastoMes)}</td>
+                        <td className="td text-right text-gray-500 text-xs">{item.pctTotal}%</td>
+                        <td className="td">
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.fornecedorPrincipal || '—'}</span>
+                        </td>
+                        <td className="td">
+                          <div className="flex flex-wrap gap-1">
+                            {item.outrosFornecedores.map(f => (
+                              <span key={f} className="text-xs bg-gray-50 text-gray-500 border border-gray-100 px-1.5 py-0.5 rounded">{f}</span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── MONTAR PEDIDO ── */}
+      {aba === 'pedido' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Montar pedido de compra</h2>
+              <p className="text-xs text-gray-500">Busque produtos, o sistema sugere o fornecedor e monta a lista</p>
+            </div>
+          </div>
+
+          {/* Busca */}
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+            <div className="text-sm font-medium text-emerald-800 mb-3">Adicionar produto ao pedido</div>
+            <div className="flex gap-2">
+              <input type="text" placeholder="Buscar por nome ou SKU..."
+                value={buscaPedido} onChange={e => setBuscaPedido(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && buscarProduto()}
+                className="inp flex-1" />
+              <button onClick={buscarProduto} disabled={buscando} className="btn-primary">
+                <Search size={14} /> {buscando ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+
+            {buscaRes && sugestao && (
+              <div className="mt-4 bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium text-gray-900">{buscaRes.nome}</div>
+                    <div className="text-xs text-gray-400">SKU {buscaRes.sku}</div>
+                  </div>
+                  <button onClick={() => { setBuscaRes(null); setSugestao(null) }}>
+                    <X size={16} className="text-gray-400 hover:text-gray-600" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 mb-2">Últimas 2 compras</div>
+                    {sugestao.ultimas2Compras.length === 0 ? (
+                      <div className="text-xs text-gray-400">Nenhuma compra registrada</div>
+                    ) : sugestao.ultimas2Compras.map((c, i) => (
+                      <div key={i} className="text-xs text-gray-600 mb-1">
+                        <span className="bg-gray-100 px-1.5 py-0.5 rounded mr-2">{c.fornecedor}</span>
+                        {brl(c.custoUnitario)}/kg — {dt(c.dataCompra)}
+                      </div>
+                    ))}
+                    {sugestao.qtd30dias > 0 && (
+                      <div className="text-xs text-gray-500 mt-2">Últimos 30 dias: <strong>{sugestao.qtd30dias} kg</strong></div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Fornecedor</label>
+                      <select value={fornSel} onChange={e => setFornSel(e.target.value)} className="inp w-full text-sm">
+                        <option value="">Selecionar...</option>
+                        {sugestao.fornecedorSugerido && (
+                          <option value={sugestao.fornecedorSugerido}>✓ {sugestao.fornecedorSugerido} (sugerido)</option>
+                        )}
+                        {fornecedores.filter(f => f.nome !== sugestao.fornecedorSugerido).map(f => (
+                          <option key={f.id} value={f.nome}>{f.nome}</option>
+                        ))}
+                      </select>
+                      {fornSel && sugestao.aliases.find(a => a.fornecedor === fornSel) && (
+                        <div className="text-xs text-blue-600 mt-1">
+                          Nome neste fornecedor: <strong>{sugestao.aliases.find(a => a.fornecedor === fornSel)?.nomeNoFornecedor}</strong>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Quantidade</label>
+                        <input type="number" value={qtdInput} onChange={e => setQtdInput(e.target.value)} className="inp" min="0" step="0.5" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Unidade</label>
+                        <select value={unidInput} onChange={e => setUnidInput(e.target.value)} className="inp">
+                          <option value="kg">kg</option>
+                          <option value="un">un</option>
+                          <option value="cx">cx</option>
+                          <option value="sc">sc</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button onClick={adicionarAoPedido} disabled={!fornSel || !qtdInput}
+                      className="btn-primary w-full justify-center disabled:opacity-40">
+                      <Plus size={14} /> Adicionar ao pedido
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pedido agrupado */}
+          {pedido.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
+              Nenhum item no pedido ainda. Busque produtos acima para adicionar.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(pedido.reduce<Record<string,PedidoItemLocal[]>>((acc, item) => {
+                if (!acc[item.fornecedor]) acc[item.fornecedor] = []
+                acc[item.fornecedor].push(item)
+                return acc
+              }, {})).map(([forn, itens]) => {
+                const total = itens.reduce((s, i) => s + (i.precoUnitario || 0) * i.quantidade, 0)
+                return (
+                  <div key={forn} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <Building2 size={16} className="text-gray-500" />
+                        <span className="font-medium text-gray-800">{forn}</span>
+                        <span className="text-xs text-gray-400">{itens.length} {itens.length === 1 ? 'item' : 'itens'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {total > 0 && <span className="text-xs text-gray-500">Estimativa: {brl(total)}</span>}
+                        <button onClick={() => exportarFornecedor(forn, itens)}
+                          className="btn-ghost text-xs"><Download size={12} /> Copiar lista</button>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      {itens.map((item, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_160px_80px_40px] gap-3 px-4 py-3 items-center hover:bg-gray-50/50">
+                          <div>
+                            <div className="text-sm font-medium text-gray-800">{item.nomeProduto}</div>
+                            <div className="text-xs text-gray-400">SKU {item.skuPrincipal}</div>
+                          </div>
+                          <div>
+                            {item.nomeNoFornecedor ? (
+                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
+                                {item.nomeNoFornecedor}
+                              </span>
+                            ) : <span className="text-xs text-gray-300">— sem alias</span>}
+                          </div>
+                          <div className="text-sm text-right text-gray-700">{item.quantidade} {item.unidade}</div>
+                          <div className="flex justify-end">
+                            <button onClick={() => setPedido(p => p.filter((_, j) => j !== pedido.indexOf(item)))}
+                              className="p-1 text-gray-300 hover:text-red-400"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── NOMES POR FORNECEDOR (ALIASES) ── */}
+      {aba === 'aliases' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Nomes por fornecedor</h2>
+              <p className="text-xs text-gray-500">Como cada fornecedor chama seus produtos</p>
+            </div>
+            <button onClick={() => setModalAlias(true)} className="btn-primary text-xs">
+              <Plus size={13} /> Adicionar alias
+            </button>
+          </div>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+            Os aliases se constroem automaticamente. Cadastre aqui o nome que o fornecedor usa para cada produto — o sistema usará na hora de montar o pedido.
+          </div>
+          {loadingLista ? <Loading /> : aliases.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
+              Nenhum alias cadastrado ainda.
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="th">Produto (Precify)</th>
+                    <th className="th">Fornecedor</th>
+                    <th className="th">Nome no fornecedor</th>
+                    <th className="th">Código deles</th>
+                    <th className="th">Embalagem</th>
+                    <th className="th text-right">Último preço</th>
+                    <th className="th"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aliases.map(alias => (
+                    <tr key={alias.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="td">
+                        <div className="font-medium text-gray-900">{alias.produto?.nome || alias.skuPrincipal}</div>
+                        <div className="text-xs text-gray-400">SKU {alias.skuPrincipal}</div>
+                      </td>
+                      <td className="td"><span className="badge-gray">{alias.fornecedor}</span></td>
+                      <td className="td"><span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">{alias.nomeNoFornecedor}</span></td>
+                      <td className="td text-xs text-gray-500">{alias.codigoFornecedor || '—'}</td>
+                      <td className="td text-xs text-gray-500">{alias.embalagem || '—'}</td>
+                      <td className="td text-right text-sm text-gray-700">
+                        {alias.ultimoPreco ? brl(alias.ultimoPreco) : '—'}
+                        {alias.dataUltimoPreco && <div className="text-xs text-gray-400">{dt(alias.dataUltimoPreco)}</div>}
+                      </td>
+                      <td className="td">
+                        <button onClick={async () => { await fetch(`/api/aliases/${alias.id}`, { method: 'DELETE' }); loadAliases() }}
+                          className="p-1 text-gray-300 hover:text-red-400"><Trash2 size={14} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Modal alias */}
+          {modalAlias && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-gray-900">Adicionar alias</h3>
+                  <button onClick={() => setModalAlias(false)}><X size={18} className="text-gray-400" /></button>
+                </div>
+                {[
+                  { label: 'SKU do produto (Precify) *', key: 'skuPrincipal', placeholder: 'ex: 242' },
+                  { label: 'Nome no fornecedor *', key: 'nomeNoFornecedor', placeholder: 'ex: SEMENTE DE CHIA 25KG' },
+                  { label: 'Código do fornecedor', key: 'codigoFornecedor', placeholder: 'ex: 571 (opcional)' },
+                  { label: 'Embalagem', key: 'embalagem', placeholder: 'ex: SC 25kg' },
+                  { label: 'Último preço visto', key: 'ultimoPreco', placeholder: 'ex: 525.00' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label className="lbl">{f.label}</label>
+                    <input className="inp" value={(aliasForm as Record<string,string>)[f.key]}
+                      onChange={e => setAliasForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder} />
+                  </div>
+                ))}
+                <div>
+                  <label className="lbl">Fornecedor *</label>
+                  <select className="inp w-full" value={aliasForm.fornecedor}
+                    onChange={e => setAliasForm(p => ({ ...p, fornecedor: e.target.value }))}>
+                    <option value="">Selecionar...</option>
+                    {fornecedores.map(f => <option key={f.id} value={f.nome}>{f.nome}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={salvarAlias}
+                    disabled={!aliasForm.skuPrincipal || !aliasForm.fornecedor || !aliasForm.nomeNoFornecedor}
+                    className="btn-primary flex-1 justify-center disabled:opacity-40">Salvar alias</button>
+                  <button onClick={() => setModalAlias(false)} className="btn-ghost">Cancelar</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
