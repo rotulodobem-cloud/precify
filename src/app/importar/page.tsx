@@ -259,7 +259,7 @@ export default function ImportarPage() {
                       <div>
                         <label className="lbl">Selecione o produto:</label>
                         <select className="inp-sm w-full" value={linha.skuFinal}
-                          onChange={e => updateLinha(idx, { skuFinal: e.target.value, isNovo: false })}>
+                          onChange={e => { const v = e.target.value; updateLinha(idx, { skuFinal: v, isNovo: v === '__novo__' }) }}>
                           <option value="">— selecione —</option>
                           {linha.sugestoes.map(s => (
                             <option key={s.skuPrincipal} value={s.skuPrincipal}>{s.nome} ({s.skuPrincipal})</option>
@@ -269,7 +269,7 @@ export default function ImportarPage() {
                       </div>
                     )}
 
-                    {(linha.status === 'novo' || linha.status === 'sku_nao_encontrado' || linha.skuFinal === '__novo__') && (
+                    {(linha.status === 'novo' || linha.status === 'sku_nao_encontrado' || linha.skuFinal === '__novo__' || linha.isNovo) && (
                       <div>
                         <label className="lbl">SKU novo *</label>
                         <input className="inp-sm w-full" value={linha.skuFinal === '__novo__' ? '' : linha.skuFinal}
@@ -279,11 +279,18 @@ export default function ImportarPage() {
                       </div>
                     )}
 
-                    {linha.status === 'confirmado' && (
+                    {linha.status === 'confirmado' && !linha.isNovo && (
                       <div>
                         <label className="lbl">SKU confirmado</label>
-                        <div className="inp-sm w-full bg-emerald-50 text-emerald-700 font-semibold">
-                          {linha.skuFinal} — {linha.nomeCadastrado}
+                        <div className="flex gap-1 items-center">
+                          <div className="inp-sm flex-1 bg-emerald-50 text-emerald-700 font-semibold">
+                            {linha.skuFinal} — {linha.nomeCadastrado}
+                          </div>
+                          <button onClick={() => updateLinha(idx, { status: 'sugestao', skuFinal: '', isNovo: false })}
+                            className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 border border-blue-200 rounded bg-blue-50 shrink-0"
+                            title="Corrigir SKU">
+                            ✏️ Editar
+                          </button>
                         </div>
                       </div>
                     )}
