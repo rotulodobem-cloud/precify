@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X } from 'lucide-react'
+import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
 
 // ── Formatadores ─────────────────────────────────────────────
@@ -123,6 +124,10 @@ export default function ComprasPage() {
   const [filtroCurva, setFiltroCurva] = useState<'todos'|'A'|'B'|'C'>('todos')
   const [aliasForm, setAliasForm]     = useState({ skuPrincipal:'', fornecedor:'', nomeNoFornecedor:'', codigoFornecedor:'', embalagem:'', ultimoPreco:'' })
   const [modalAlias, setModalAlias]   = useState(false)
+  const [importStep, setImportStep]   = useState<'idle'|'parsing'|'review'|'saving'>('idle')
+  const [importForn, setImportForn]   = useState('')
+  const [importItens, setImportItens] = useState<{descricao:string;codigo?:string;preco?:number;embalagem?:string;status?:string;skuPrincipal?:string;sugestoes?:{sku:string;nome:string;score:number}[];skuFinal?:string;ignorar?:boolean}[]>([])
+  const [importStats, setImportStats] = useState<{total:number;vinculados:number;sugestoes:number;novos:number}|null>(null)
   const [loadingLista, setLoadingLista] = useState(false)
   const [buscaRanking, setBuscaRanking]     = useState('')
   const [buscaMelhor, setBuscaMelhor]       = useState('')
@@ -300,6 +305,46 @@ export default function ComprasPage() {
     await fetch('/api/aliases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(aliasForm) })
     setModalAlias(false)
     setAliasForm({ skuPrincipal:'', fornecedor:'', nomeNoFornecedor:'', codigoFornecedor:'', embalagem:'', ultimoPreco:'' })
+    loadAliases()
+  }
+
+  const handleImportFile = async (file: File) => {
+    if (!importForn) { alert('Selecione o fornecedor primeiro'); return }
+    setImportStep('parsing')
+    const buf = await file.arrayBuffer()
+    const wb = XLSX.read(buf, { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows = XLSX.utils.sheet_to_json<Record<string,unknown>>(ws, { defval: '' })
+    const itens = rows.map(r => {
+      const desc = String(r['Descrição'] ?? r['Descricao'] ?? r['descricao'] ?? r['DESCRIÇÃO'] ?? r['Nome'] ?? r['nome'] ?? r['Produto'] ?? r['produto'] ?? Object.values(r)[0] ?? '').trim()
+      const cod  = String(r['Cod.'] ?? r['Cod'] ?? r['cod'] ?? r['Código'] ?? r['codigo'] ?? r['COD'] ?? '').trim() || undefined
+      const precoStr = String(r['Á vista'] ?? r['A vista'] ?? r['Débito/Crédito'] ?? r['Preço'] ?? r['preco'] ?? r['Valor'] ?? '').replace(/[R$\s.]/g, '').replace(',', '.')
+      const preco = parseFloat(precoStr) || undefined
+      const embMatch = desc.match(/(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|SC|PC|CX|FD)/i)
+      const embalagem = embMatch ? embMatch[0] : undefined
+      return { descricao: desc, codigo: cod, preco, embalagem }
+    }).filter(i => i.descricao.length > 2)
+    // Enviar para API fazer o matching
+    const r = await fetch('/api/aliases/importar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fornecedor: importForn, itens })
+    })
+    const data = await r.json()
+    setImportItens(data.resultado.map((it: Record<string,unknown>) => ({ ...it, skuFinal: it.skuPrincipal || '', ignorar: false })))
+    setImportStats(data.stats)
+    setImportStep('review')
+  }
+
+  const salvarImport = async () => {
+    setImportStep('saving')
+    const vinculos = importItens.filter(i => !i.ignorar && i.skuFinal).map(i => ({
+      descricao: i.descricao, codigo: i.codigo, embalagem: i.embalagem, preco: i.preco, skuPrincipal: i.skuFinal!,
+    }))
+    await fetch('/api/aliases/importar', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fornecedor: importForn, vinculos })
+    })
+    setImportStep('idle'); setImportItens([]); setImportStats(null); setImportForn('')
     loadAliases()
   }
 
@@ -981,17 +1026,134 @@ export default function ComprasPage() {
       {/* ── NOMES POR FORNECEDOR (ALIASES) ── */}
       {aba === 'aliases' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-base font-semibold text-gray-900">Nomes por fornecedor</h2>
-              <p className="text-xs text-gray-500">Como cada fornecedor chama seus produtos</p>
+              <p className="text-xs text-gray-500">Importe a tabela de preços do fornecedor para associar os produtos</p>
             </div>
-            <button onClick={() => setModalAlias(true)} className="btn-primary text-xs">
-              <Plus size={13} /> Adicionar alias
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setModalAlias(true)} className="btn-ghost text-xs">
+                <Plus size={13} /> Alias manual
+              </button>
+            </div>
           </div>
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
-            Os aliases se constroem automaticamente. Cadastre aqui o nome que o fornecedor usa para cada produto — o sistema usará na hora de montar o pedido.
+
+          {/* IMPORTAR LISTA DO FORNECEDOR */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+            <div className="text-sm font-medium text-emerald-800 mb-3 flex items-center gap-2">
+              <FileSpreadsheet size={16} /> Importar lista de preços do fornecedor
+            </div>
+
+            {importStep === 'idle' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="lbl">Fornecedor *</label>
+                  <select className="inp w-full max-w-xs" value={importForn} onChange={e => setImportForn(e.target.value)}>
+                    <option value="">Selecionar fornecedor...</option>
+                    {fornecedores.map(f => <option key={f.id} value={f.nome}>{f.nome}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed transition-colors cursor-pointer ${importForn ? 'border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'}`}>
+                    <Upload size={16} />
+                    <span className="text-sm font-medium">Subir planilha ou CSV do fornecedor</span>
+                    <input type="file" className="hidden" accept=".xlsx,.xls,.csv"
+                      disabled={!importForn}
+                      onChange={e => { if (e.target.files?.[0]) handleImportFile(e.target.files[0]); e.target.value = '' }} />
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500">Formatos aceitos: Excel (.xlsx, .xls) ou CSV. A planilha deve ter colunas como Descrição, Cod., Preço.</p>
+              </div>
+            )}
+
+            {importStep === 'parsing' && (
+              <div className="text-center py-6">
+                <div className="text-sm text-emerald-700">Processando planilha e buscando correspondências...</div>
+              </div>
+            )}
+
+            {importStep === 'review' && importStats && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="bg-white rounded-lg p-2 border border-gray-100">
+                    <div className="text-lg font-semibold">{importStats.total}</div>
+                    <div className="text-xs text-gray-500">Total</div>
+                  </div>
+                  <div className="bg-emerald-100 rounded-lg p-2 border border-emerald-200">
+                    <div className="text-lg font-semibold text-emerald-700">{importStats.vinculados}</div>
+                    <div className="text-xs text-emerald-600">Já vinculados</div>
+                  </div>
+                  <div className="bg-amber-100 rounded-lg p-2 border border-amber-200">
+                    <div className="text-lg font-semibold text-amber-700">{importStats.sugestoes}</div>
+                    <div className="text-xs text-amber-600">Sugestões</div>
+                  </div>
+                  <div className="bg-gray-100 rounded-lg p-2 border border-gray-200">
+                    <div className="text-lg font-semibold text-gray-700">{importStats.novos}</div>
+                    <div className="text-xs text-gray-500">Não reconhecidos</div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-200 overflow-auto max-h-[400px]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="th w-8"></th>
+                        <th className="th">Produto no fornecedor</th>
+                        <th className="th w-16">Cód.</th>
+                        <th className="th text-right w-20">Preço</th>
+                        <th className="th w-20">Status</th>
+                        <th className="th w-64">Vincular ao produto (Precify)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {importItens.map((item, idx) => (
+                        <tr key={idx} className={`text-xs ${item.ignorar ? 'opacity-40' : ''} ${item.status === 'vinculado' ? 'bg-emerald-50/30' : item.status === 'sugestao' ? 'bg-amber-50/30' : ''}`}>
+                          <td className="td">
+                            <input type="checkbox" checked={!item.ignorar}
+                              onChange={e => { const n=[...importItens]; n[idx]={...n[idx],ignorar:!e.target.checked}; setImportItens(n) }} />
+                          </td>
+                          <td className="td font-medium">{item.descricao}</td>
+                          <td className="td text-gray-500">{item.codigo || '—'}</td>
+                          <td className="td text-right">{item.preco ? brl(item.preco) : '—'}</td>
+                          <td className="td">
+                            <span className={`badge ${item.status === 'vinculado' ? 'badge-green' : item.status === 'sugestao' ? 'badge-amber' : 'badge-gray'}`}>
+                              {item.status === 'vinculado' ? '✓' : item.status === 'sugestao' ? '?' : 'novo'}
+                            </span>
+                          </td>
+                          <td className="td">
+                            {!item.ignorar && (
+                              <select className="inp-sm w-full" value={item.skuFinal || ''}
+                                onChange={e => { const n=[...importItens]; n[idx]={...n[idx],skuFinal:e.target.value}; setImportItens(n) }}>
+                                <option value="">— ignorar / não vincular —</option>
+                                {item.sugestoes?.map(s => (
+                                  <option key={s.sku} value={s.sku}>{s.nome} ({s.sku}) — {Math.round(s.score*100)}%</option>
+                                ))}
+                                {item.skuPrincipal && !item.sugestoes?.find(s => s.sku === item.skuPrincipal) && (
+                                  <option value={item.skuPrincipal}>{item.skuPrincipal} (vinculado)</option>
+                                )}
+                                <option value="__buscar__">🔍 Buscar outro produto...</option>
+                              </select>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => { setImportStep('idle'); setImportItens([]); setImportStats(null) }}
+                    className="btn-ghost">Cancelar</button>
+                  <button onClick={salvarImport} className="btn-primary">
+                    <Check size={14} /> Salvar {importItens.filter(i => !i.ignorar && i.skuFinal).length} vínculos
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {importStep === 'saving' && (
+              <div className="text-center py-6 text-sm text-emerald-700">Salvando vínculos...</div>
+            )}
           </div>
           {loadingLista ? <Loading /> : aliases.length === 0 ? (
             <div className="bg-gray-50 rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
