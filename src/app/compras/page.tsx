@@ -124,6 +124,8 @@ export default function ComprasPage() {
   const [aliasForm, setAliasForm]     = useState({ skuPrincipal:'', fornecedor:'', nomeNoFornecedor:'', codigoFornecedor:'', embalagem:'', ultimoPreco:'' })
   const [modalAlias, setModalAlias]   = useState(false)
   const [loadingLista, setLoadingLista] = useState(false)
+  const [buscaRanking, setBuscaRanking]     = useState('')
+  const [buscaMelhor, setBuscaMelhor]       = useState('')
   const [skuLoading, setSkuLoading] = useState(false)
   const skuTimer = useRef<NodeJS.Timeout>()
 
@@ -532,8 +534,11 @@ export default function ComprasPage() {
       {/* ── RANKING ── */}
       {aba === 'ranking' && (
         <div className="card-tight overflow-auto">
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <span className="section-title">Top 20 — variação de preço de compra (vs. anterior)</span>
+          <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
+            <span className="section-title">Variação de preço de compra (vs. anterior)</span>
+            <input type="text" placeholder="Buscar por nome ou SKU..." value={buscaRanking}
+              onChange={e => setBuscaRanking(e.target.value)}
+              className="inp-sm w-60" />
           </div>
           <table className="w-full">
             <thead className="tbl-head"><tr>
@@ -544,7 +549,7 @@ export default function ComprasPage() {
             <tbody className="divide-y divide-gray-50">
               {loading && <Loading />}
               {!loading && !dash?.ranking20.length && <Empty msg="Nenhuma variação registrada" />}
-              {(dash?.ranking20 ?? []).map((r, i) => (
+              {(dash?.ranking20 ?? []).filter(r => !buscaRanking || r.sku.toLowerCase().includes(buscaRanking.toLowerCase()) || r.produto.toLowerCase().includes(buscaRanking.toLowerCase())).map((r, i) => (
                 <tr key={r.sku + i} className={`tr-row ${r.status === 'AUMENTOU > 5%' ? 'bg-red-50/40' : r.status === 'DIMINUIU > 5%' ? 'bg-emerald-50/40' : ''}`}>
                   <td className="td text-xs text-gray-400">{i + 1}</td>
                   <td className="td font-mono text-xs font-bold text-indigo-600">{r.sku}</td>
@@ -607,7 +612,12 @@ export default function ComprasPage() {
       {/* ── MELHOR PREÇO ── */}
       {aba === 'melhor_preco' && (
         <div className="space-y-3">
-          <p className="text-sm text-gray-500">Produtos comprados de mais de um fornecedor — qual oferece o menor preço.</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-gray-500">Produtos comprados de mais de um fornecedor — qual oferece o menor preço.</p>
+            <input type="text" placeholder="Buscar por nome ou SKU..." value={buscaMelhor}
+              onChange={e => setBuscaMelhor(e.target.value)}
+              className="inp-sm w-60" />
+          </div>
           <div className="card-tight overflow-auto">
             <table className="w-full">
               <thead className="tbl-head"><tr>
@@ -619,7 +629,7 @@ export default function ComprasPage() {
               <tbody className="divide-y divide-gray-50">
                 {loading && <Loading />}
                 {!loading && !dash?.melhorPreco.length && <Empty msg="Nenhum produto com múltiplos fornecedores" />}
-                {(dash?.melhorPreco ?? []).map(m => (
+                {(dash?.melhorPreco ?? []).filter(m => !buscaMelhor || m.sku.toLowerCase().includes(buscaMelhor.toLowerCase()) || m.produto.toLowerCase().includes(buscaMelhor.toLowerCase())).map(m => (
                   <tr key={m.sku} className="tr-row">
                     <td className="td font-mono text-xs font-bold text-indigo-600">{m.sku}</td>
                     <td className="td text-sm font-medium">{m.produto}</td>
