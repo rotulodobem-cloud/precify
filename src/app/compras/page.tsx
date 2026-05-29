@@ -311,20 +311,33 @@ export default function ComprasPage() {
   const handleImportFile = async (file: File) => {
     if (!importForn) { alert('Selecione o fornecedor primeiro'); return }
     setImportStep('parsing')
-    const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rows = XLSX.utils.sheet_to_json<Record<string,unknown>>(ws, { defval: '' })
-    const itens = rows.map(r => {
-      const desc = String(r['Descrição'] ?? r['Descricao'] ?? r['descricao'] ?? r['DESCRIÇÃO'] ?? r['Nome'] ?? r['nome'] ?? r['Produto'] ?? r['produto'] ?? Object.values(r)[0] ?? '').trim()
-      const cod  = String(r['Cod.'] ?? r['Cod'] ?? r['cod'] ?? r['Código'] ?? r['codigo'] ?? r['COD'] ?? '').trim() || undefined
-      const precoStr = String(r['Á vista'] ?? r['A vista'] ?? r['Débito/Crédito'] ?? r['Preço'] ?? r['preco'] ?? r['Valor'] ?? '').replace(/[R$\s.]/g, '').replace(',', '.')
-      const preco = parseFloat(precoStr) || undefined
-      const embMatch = desc.match(/(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|SC|PC|CX|FD)/i)
-      const embalagem = embMatch ? embMatch[0] : undefined
-      return { descricao: desc, codigo: cod, preco, embalagem }
-    }).filter(i => i.descricao.length > 2)
-    // Enviar para API fazer o matching
+
+    let itens: {descricao:string;codigo?:string;preco?:number;embalagem?:string}[] = []
+
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      const form = new FormData()
+      form.append('file', file)
+      const pdfRes = await fetch('/api/aliases/importar-pdf', { method: 'POST', body: form })
+      const pdfData = await pdfRes.json()
+      itens = pdfData.itens || []
+    } else {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<Record<string,unknown>>(ws, { defval: '' })
+      itens = rows.map(r => {
+        const desc = String(r['Descri\u00e7\u00e3o'] ?? r['Descricao'] ?? r['descricao'] ?? r['DESCRI\u00c7\u00c3O'] ?? r['Nome'] ?? r['nome'] ?? r['Produto'] ?? r['produto'] ?? Object.values(r)[0] ?? '').trim()
+        const cod  = String(r['Cod.'] ?? r['Cod'] ?? r['cod'] ?? r['C\u00f3digo'] ?? r['codigo'] ?? r['COD'] ?? '').trim() || undefined
+        const precoStr = String(r['\u00c1 vista'] ?? r['A vista'] ?? r['D\u00e9bito/Cr\u00e9dito'] ?? r['Pre\u00e7o'] ?? r['preco'] ?? r['Valor'] ?? '').replace(/[R$\s.]/g, '').replace(',', '.')
+        const preco = parseFloat(precoStr) || undefined
+        const embMatch = desc.match(/(\d+(?:[.,]\d+)?)\s*(KG|G|ML|L|UN|SC|PC|CX|FD)\b/i)
+        const embalagem = embMatch ? embMatch[0] : undefined
+        return { descricao: desc, codigo: cod, preco, embalagem }
+      }).filter(i => i.descricao.length > 2)
+    }
+
+    if (!itens.length) { alert('Nenhum produto encontrado no arquivo'); setImportStep('idle'); return }
+
     const r = await fetch('/api/aliases/importar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fornecedor: importForn, itens })
@@ -1056,13 +1069,13 @@ export default function ComprasPage() {
                 <div className="flex items-center gap-3">
                   <label className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed transition-colors cursor-pointer ${importForn ? 'border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'}`}>
                     <Upload size={16} />
-                    <span className="text-sm font-medium">Subir planilha ou CSV do fornecedor</span>
-                    <input type="file" className="hidden" accept=".xlsx,.xls,.csv"
+                    <span className="text-sm font-medium">Subir tabela do fornecedor (PDF, Excel ou CSV)</span>
+                    <input type="file" className="hidden" accept=".xlsx,.xls,.csv,.pdf"
                       disabled={!importForn}
                       onChange={e => { if (e.target.files?.[0]) handleImportFile(e.target.files[0]); e.target.value = '' }} />
                   </label>
                 </div>
-                <p className="text-xs text-gray-500">Formatos aceitos: Excel (.xlsx, .xls) ou CSV. A planilha deve ter colunas como Descrição, Cod., Preço.</p>
+                <p className="text-xs text-gray-500">Formatos aceitos: PDF, Excel (.xlsx, .xls) ou CSV. O sistema extrai automaticamente os produtos da tabela.</p>
               </div>
             )}
 
