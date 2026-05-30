@@ -319,6 +319,16 @@ export default function ComprasPage() {
       form.append('file', file)
       const pdfRes = await fetch('/api/aliases/importar-pdf', { method: 'POST', body: form })
       const pdfData = await pdfRes.json()
+      if (pdfData.servicoOffline) {
+        alert('O serviço de PDF não está rodando.\n\nAbra um novo terminal na pasta do projeto e execute:\n  python python\\pdf_parser.py\n\nDepois tente subir o PDF novamente.')
+        setImportStep('idle')
+        return
+      }
+      if (pdfData.error) {
+        alert('Erro ao processar PDF: ' + pdfData.error)
+        setImportStep('idle')
+        return
+      }
       itens = pdfData.itens || []
     } else {
       const buf = await file.arrayBuffer()
