@@ -1,88 +1,95 @@
 import { NextRequest, NextResponse } from 'next/server'
-import pdf from 'pdf-parse'
+
+// Timeout helper
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ])
 
 export async function POST(req: NextRequest) {
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'Arquivo não enviado' }, { status: 400 })
+  try {
+    const formData = await req.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return NextResponse.json({ error: 'Arquivo não enviado' }, { status: 400 })
 
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const data = await pdf(buffer)
-  const text = data.text
+    const buffer = Buffer.from(await file.arrayBuffer())
 
-  // Parsear linhas do PDF — cada linha com descrição, código e preço
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3)
+    // Dynamic import to avoid build issues
+    const pdfParse = (await import('pdf-parse')).default
+    const data = await withTimeout(pdfParse(buffer), 15000) // 15s timeout
+    const text = data.text
 
+    const itens = parsearTextoFornecedor(text)
+
+    return NextResponse.json({
+      totalLinhas: text.split('\n').length,
+      itensExtraidos: itens.length,
+      itens,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+    if (msg === 'timeout') {
+      return NextResponse.json({ error: 'PDF muito grande ou complexo. Tente converter para Excel primeiro.', itens: [] }, { status: 408 })
+    }
+    return NextResponse.json({ error: `Erro ao processar PDF: ${msg}`, itens: [] }, { status: 500 })
+  }
+}
+
+function parsearTextoFornecedor(text: string) {
   const itens: { descricao: string; codigo?: string; preco?: number; embalagem?: string }[] = []
+  const linhas = text.split('\n').map(l => l.trim()).filter(l => l.length > 3)
 
-  for (const line of lines) {
-    // Padrão típico de tabela de fornecedor:
-    // "SEMENTE DE CHIA 25KG 571 SC R$ 541,00 R$ 525,00"
-    // ou "AMENDOIM S/ PELE 25KG 103 SC R$ 221,50 R$ 215,00"
+  for (const linha of linhas) {
+    // Ignora cabeçalhos e rodapés
+    if (/^(Descrição|Cod\.|Un\b|Débito|Á vista|Desconto|Tabela|Preços sujeitos|TABELA|Tel|Fax|Email|Rua|www\.|http)/i.test(linha)) continue
+    if (linha.split(/\s+/).length < 2) continue
 
-    // Tenta extrair preço (R$ ou valor numérico no final)
-    const precoMatch = line.match(/R?\$?\s*([\d.,]+)\s*$/i)
-      || line.match(/R?\$?\s*([\d.,]+)\s+R?\$?\s*[\d.,]+\s*$/i)
-    if (!precoMatch) continue
+    // Tenta extrair preço brasileiro (ex: 525,00 ou 1.234,50)
+    const precos = linha.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)
+    if (!precos) continue
 
-    // Ignora linhas de cabeçalho
-    if (/^(Descrição|Cod\.|Un\b|Débito|Á vista|Desconto)/i.test(line)) continue
-    if (/Tabela de Produtos|Preços sujeitos|TABELA ATUALIZADO/i.test(line)) continue
+    // Pega o último preço (geralmente é o "à vista")
+    const ultimoPreco = precos[precos.length - 1]
+    const preco = parseFloat(ultimoPreco.replace(/\./g, '').replace(',', '.'))
+    if (preco < 0.5 || preco > 100000) continue // filtra valores absurdos
 
-    // Tenta extrair código do fornecedor (número isolado de 1-5 dígitos)
-    const parts = line.split(/\s+/)
+    // Remove os preços da linha para isolar o nome e código
+    let semPrecos = linha
+    for (const p of precos) semPrecos = semPrecos.replace(p, '')
+    semPrecos = semPrecos.replace(/R\$\s*/g, '').replace(/\s+/g, ' ').trim()
+
+    // Tenta extrair código (número de 1-5 dígitos isolado)
+    const codMatch = semPrecos.match(/^(.+?)\s+(\d{1,5})\s+(SC|PC|CX|FD|UN|KG|SC|FD)?\s*$/i)
     let descricao = ''
     let codigo: string | undefined
-    let preco: number | undefined
     let embalagem: string | undefined
 
-    // Busca o preço — último valor numérico no formato brasileiro
-    const allPrices = line.match(/\d{1,3}(?:\.\d{3})*,\d{2}/g)
-    if (allPrices && allPrices.length > 0) {
-      // Pega o último preço (geralmente é o "à vista")
-      const lastPrice = allPrices[allPrices.length - 1]
-      preco = parseFloat(lastPrice.replace(/\./g, '').replace(',', '.'))
-    }
-
-    // Busca código — número de 1-5 dígitos que aparece depois do nome e antes de SC/PC/CX/FD/UN
-    const codMatch = line.match(/^(.+?)\s+(\d{1,5})\s+(SC|PC|CX|FD|UN|KG)\s/i)
     if (codMatch) {
       descricao = codMatch[1].trim()
       codigo = codMatch[2]
-      embalagem = codMatch[3]
+      embalagem = codMatch[3] || undefined
     } else {
-      // Fallback: pega tudo antes do primeiro preço
-      const firstPriceIdx = line.search(/R?\$\s*\d/)
-      if (firstPriceIdx > 0) {
-        const beforePrice = line.substring(0, firstPriceIdx).trim()
-        // Remove unidade e código do final
-        const cleanMatch = beforePrice.match(/^(.+?)\s+(\d{1,5})?\s*(SC|PC|CX|FD|UN|KG)?\s*$/i)
-        if (cleanMatch) {
-          descricao = cleanMatch[1].trim()
-          codigo = cleanMatch[2] || undefined
-          embalagem = cleanMatch[3] || undefined
-        } else {
-          descricao = beforePrice
-        }
+      // Remove número solto do final
+      const simplMatch = semPrecos.match(/^(.+?)\s+(\d{1,5})\s*$/)
+      if (simplMatch) {
+        descricao = simplMatch[1].trim()
+        codigo = simplMatch[2]
       } else {
-        continue
+        descricao = semPrecos.trim()
       }
     }
 
-    if (descricao.length < 3) continue
+    if (descricao.length < 3 || descricao.length > 80) continue
 
-    // Detecta embalagem no nome (ex: "25KG", "5KG", "10X1KG")
-    const embMatch = descricao.match(/(\d+(?:[xX]\d+)?(?:[.,]\d+)?\s*(?:KG|G|ML|L|UN))\b/i)
-    if (embMatch && !embalagem) {
-      embalagem = embMatch[1]
+    // Extrai embalagem do nome (ex: 25KG, 5KG, 10X1KG)
+    if (!embalagem) {
+      const embMatch = descricao.match(/\b(\d+(?:[xX]\d+)?(?:[.,]\d+)?\s*(?:KG|G|ML|L|UN))\b/i)
+      if (embMatch) embalagem = embMatch[1].toUpperCase()
     }
 
     itens.push({ descricao, codigo, preco, embalagem })
   }
 
-  return NextResponse.json({
-    totalLinhas: lines.length,
-    itensExtraidos: itens.length,
-    itens,
-  })
+  return itens
 }
