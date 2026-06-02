@@ -411,7 +411,7 @@ export default function CalculadoraPage() {
                                 <CheckCircle2 size={14} /> {salvos[key]}
                               </span>
                             ) : (
-                              <button onClick={() => salvarAnuncio(rv, col)} disabled={isSalvando}
+                              <button onClick={() => salvarAnuncio(rv, col)} disabled={!!isSalvando}
                                 className="btn-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200">
                                 {isSalvando ? <Spinner size={12} /> : <Save size={12} />}
                                 {isSalvando ? '…' : 'Salvar'}
