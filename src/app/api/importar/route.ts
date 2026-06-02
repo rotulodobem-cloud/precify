@@ -9,7 +9,6 @@ import { saveCompra } from '../compras/route'
 // tipo=precificacao → Planilha_de_Precificação.xlsx
 // tipo=auto → tenta detectar automaticamente
 
-export const config = { api: { bodyParser: false } }
 
 function parseExcelDate(v: unknown): Date | null {
   if (!v) return null
