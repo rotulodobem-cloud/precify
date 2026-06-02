@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import db from '@/lib/db'
 import { calcPrecificacaoCompleta, round2 } from '@/lib/calculos'
-import { saveCompra } from '../compras/route'
+import { saveCompra } from '@/lib/saveCompra'
+
 
 // ─── Tipo do arquivo ─────────────────────────────────────────
 // tipo=compras → CONTROLE_DE_COMPRAS.xlsx
@@ -213,3 +214,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(resultado)
 }
+
