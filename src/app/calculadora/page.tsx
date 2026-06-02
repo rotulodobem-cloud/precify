@@ -215,7 +215,7 @@ export default function CalculadoraPage() {
       setSalvos(p => ({ ...p, [key]: atualizado ? 'Atualizado!' : 'Salvo!' }))
       setTimeout(() => setSalvos(p => ({ ...p, [key]: '' })), 4000)
     }
-    setSalvando(p => ({ ...p, [key]: false }))
+    setSalvando(p => ({ ...p, [key]: '' }))
   }
 
   const salvarTodos = async (rv: ResultadoVariacao) => {
