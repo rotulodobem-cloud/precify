@@ -100,7 +100,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={4} className="py-8 text-center text-gray-400 text-sm"><Spinner size={16}" /></td></tr>}
+                {loading && <tr><td colSpan={4} className="py-8 text-center text-gray-400 text-sm"><Spinner size={16} className="inline" /></td></tr>}
                 {!loading && (!data?.alertas.length) && <tr><td colSpan={4} className="py-8 text-center text-gray-400 text-sm">Nenhum alerta 🎉</td></tr>}
                 {data?.alertas.map((a, i) => (
                   <tr key={i} className="tr-row">
@@ -230,4 +230,3 @@ function StatCard({ title, value, sub, icon: Icon, color }: { title: string; val
     </div>
   )
 }
-
