@@ -185,7 +185,7 @@ export default function CalculadoraPage() {
   // ── Salvar como anúncio ───────────────────────────────────
   const salvarAnuncio = async (rv: ResultadoVariacao, col: ResultadoVariacao['canais'][0]) => {
     const key = `${rv.skuVariacao}_${col.canal.key}`
-    setSalvando(p => ({ ...p, [key]: true }))
+    setSalvando(p => ({ ...p, [key]: 'Salvo!' }))
     setError('')
 
     const r = await fetch('/api/anuncios', {
