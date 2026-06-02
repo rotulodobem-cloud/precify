@@ -139,7 +139,7 @@ export default function CalculadoraPage() {
   // ── Calcular ──────────────────────────────────────────────
   const calcular = () => {
     if (!produto) return
-    const vars = produto.variacoes.filter(v => v.status !== 'inativo')
+    const vars = produto.variacoes
 
     const res: ResultadoVariacao[] = vars.map(v => {
       const custoTotal = v.custoTotal ?? v.custoCalculado ?? produto.custoAtualizado ?? 0
