@@ -81,8 +81,8 @@ export default function CalculadoraPage() {
   const [canais, setCanais]     = useState<Canal[]>(CANAIS_PADRAO)
   const [resultados, setResultados] = useState<ResultadoVariacao[]>([])
   const [calculado, setCalculado]   = useState(false)
-  const [salvando, setSalvando]     = useState<Record<string, boolean>>({})
-  const [salvos, setSalvos]         = useState<Record<string, boolean>>({})
+  const [salvando, setSalvando]     = useState<Record<string, string>>({})
+  const [salvos, setSalvos]         = useState<Record<string, string>>({})
   const [error, setError]           = useState('')
   const timer = useRef<NodeJS.Timeout>()
 
