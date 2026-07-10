@@ -1,4 +1,6 @@
-node_modules/  
-.next/  
-prisma/dev.db  
-.env 
+node_modules/
+.next/
+prisma/dev.db
+.env
+.env.local
+backups/

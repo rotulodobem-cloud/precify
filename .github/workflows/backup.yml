@@ -1,0 +1,54 @@
+name: Backup diário do banco de dados
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 23h (horário de Brasília, UTC-3)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        working-directory: main
+        run: npm ci
+
+      - name: Gerar backup
+        working-directory: main
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/backup-db.js
+
+      - name: Checkout branch de backups
+        uses: actions/checkout@v4
+        with:
+          ref: backups
+          path: backups-branch
+
+      - name: Publicar backup no branch "backups"
+        run: |
+          set -e
+          BACKUP_FILE=$(ls -t main/backups/backup-*.json | head -n1)
+          cp "$BACKUP_FILE" backups-branch/
+          cd backups-branch
+          git config user.name "precify-backup-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add "$(basename "$BACKUP_FILE")"
+          git commit -m "Backup automático $(date -u +%Y-%m-%d\ %H:%M) UTC" --allow-empty
+          # mantém só os últimos 90 backups
+          ls -t backup-*.json | tail -n +91 | xargs -r git rm --quiet -- || true
+          git commit -m "Limpeza de backups antigos" --allow-empty
+          git push origin backups
