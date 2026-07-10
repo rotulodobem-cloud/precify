@@ -20,7 +20,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # --ignore-scripts: nenhuma dependência (nem a própria @prisma/client)
       # executa código arbitrário na instalação. O DATABASE_URL só existe
