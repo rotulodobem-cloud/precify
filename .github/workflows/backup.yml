@@ -22,9 +22,16 @@ jobs:
         with:
           node-version: 20
 
-      - name: Instalar dependências
+      # --ignore-scripts: nenhuma dependência (nem a própria @prisma/client)
+      # executa código arbitrário na instalação. O DATABASE_URL só existe
+      # no ambiente do passo "Gerar backup", nunca durante a instalação.
+      - name: Instalar dependências (sem executar scripts de terceiros)
         working-directory: main
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Gerar cliente Prisma
+        working-directory: main
+        run: npx prisma generate
 
       - name: Gerar backup
         working-directory: main
@@ -37,18 +44,31 @@ jobs:
         with:
           ref: backups
           path: backups-branch
+          fetch-depth: 1
 
-      - name: Publicar backup no branch "backups"
+      # Reescreve o branch "backups" do zero a cada execução, mantendo só
+      # os N arquivos mais recentes. Isso garante retenção de verdade: os
+      # backups antigos são removidos também do histórico do Git, não só
+      # da pasta — reduzindo por quanto tempo dados sensíveis ficam expostos.
+      - name: Publicar backup no branch "backups" (com retenção real)
+        env:
+          MAX_BACKUPS: 90
         run: |
-          set -e
-          BACKUP_FILE=$(ls -t main/backups/backup-*.json | head -n1)
-          cp "$BACKUP_FILE" backups-branch/
-          cd backups-branch
-          git config user.name "precify-backup-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add "$(basename "$BACKUP_FILE")"
-          git commit -m "Backup automático $(date -u +%Y-%m-%d\ %H:%M) UTC" --allow-empty
-          # mantém só os últimos 90 backups
-          ls -t backup-*.json | tail -n +91 | xargs -r git rm --quiet -- || true
-          git commit -m "Limpeza de backups antigos" --allow-empty
-          git push origin backups
+          set -euo pipefail
+          WS="$GITHUB_WORKSPACE"
+
+          BACKUP_FILE=$(ls -t "$WS"/main/backups/backup-*.json | head -n1)
+          cp "$BACKUP_FILE" "$WS/backups-branch/"
+
+          cd "$WS/backups-branch"
+          ls -t backup-*.json | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm --
+
+          git checkout --orphan backups-tmp
+          git add README.md
+          git add backup-*.json
+          git -c user.name="precify-backup-bot" -c user.email="actions@users.noreply.github.com" \
+            commit -m "Backups automáticos (últimos $(ls backup-*.json | wc -l)) - $(date -u +%Y-%m-%d)"
+
+          git branch -D backups
+          git branch -m backups
+          git push --force origin backups
