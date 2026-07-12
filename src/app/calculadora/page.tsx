@@ -301,7 +301,7 @@ export default function CalculadoraPage() {
         <div className="space-y-4">
           {/* Busca por SKU */}
           <div className="card p-4">
-            <label className="lbl">SKU do produto</label>
+            <label className="lbl">SKU ou nome do produto</label>
             <div className="relative">
               <div className="absolute left-3 top-2.5 text-gray-400"><Search size={15} /></div>
               <input className="inp pl-9 pr-8" value={q} onChange={e => handleQ(e.target.value)}
