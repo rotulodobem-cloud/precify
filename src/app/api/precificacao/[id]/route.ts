@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     where: { id: params.id },
     data: {
       precoAtual,
+      codigoAnuncio:  b.codigoAnuncio !== undefined ? (b.codigoAnuncio || null) : ex.codigoAnuncio,
       custoEmbalagem: parseFloat(String(b.custoEmbalagem ?? ex.custoEmbalagem)),
       custoFrete:     calc.custoFrete,
       custoColeta:    parseFloat(String(b.custoColeta ?? ex.custoColeta)),

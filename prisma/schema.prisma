@@ -130,6 +130,7 @@ model Precificacao {
   impostoPct       Float      @default(0.0829)
   tipoFreteML      String     @default("full")
   precoAtual       Float?
+  codigoAnuncio    String?
   custoTotalCalc   Float?
   lucroBruto       Float?
   margemAtual      Float?

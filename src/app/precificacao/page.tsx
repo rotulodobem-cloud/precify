@@ -11,6 +11,7 @@ interface Prec {
   id: string; skuVariacao: string; plataformaId: string
   custoEmbalagem: number; custoFrete: number; custoColeta: number
   comissaoPct: number; impostoPct: number; precoAtual: number | null
+  codigoAnuncio: string | null
   tipoFreteML: string
   custoTotalCalc: number | null; lucroBruto: number | null; margemAtual: number | null
   precoMinimo: number | null; precoIdeal: number | null; precoMaximo: number | null
@@ -34,11 +35,12 @@ function PrecificacaoContent() {
   const [editModal, setEditModal] = useState<Prec | null>(null)
   const [addModal, setAddModal] = useState(false)
   const [precoInput, setPrecoInput] = useState('')
+  const [codigoAnuncioInput, setCodigoAnuncioInput] = useState('')
   const [tipoFreteEdit, setTipoFreteEdit] = useState('full')
   const [addForm, setAddForm] = useState({
     skuVariacao: '', plataformaId: '', custoEmbalagem: '',
     custoFrete: '', custoColeta: '', comissaoPct: '',
-    impostoPct: '0.08', precoAtual: '', tipoFreteML: 'full',
+    impostoPct: '0.08', precoAtual: '', codigoAnuncio: '', tipoFreteML: 'full',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -61,6 +63,7 @@ function PrecificacaoContent() {
   const openEdit = (p: Prec) => {
     setEditModal(p)
     setPrecoInput(String(p.precoAtual ?? ''))
+    setCodigoAnuncioInput(p.codigoAnuncio ?? '')
     setTipoFreteEdit(p.tipoFreteML ?? 'full')
     setError('')
   }
@@ -70,7 +73,7 @@ function PrecificacaoContent() {
     setSaving(true)
     const r = await fetch(`/api/precificacao/${editModal.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ precoAtual: precoInput || null, tipoFreteML: tipoFreteEdit }),
+      body: JSON.stringify({ precoAtual: precoInput || null, codigoAnuncio: codigoAnuncioInput || null, tipoFreteML: tipoFreteEdit }),
     })
     if (!r.ok) { setError('Erro ao salvar'); setSaving(false); return }
     setEditModal(null); setSaving(false); load()
@@ -117,7 +120,7 @@ function PrecificacaoContent() {
             {saving ? <Spinner size={12} /> : <Calculator size={13} />} Recalcular tudo
           </button>
           <button onClick={() => {
-            setAddForm({ skuVariacao: '', plataformaId: '', custoEmbalagem: '', custoFrete: '', custoColeta: '', comissaoPct: '', impostoPct: '0.08', precoAtual: '', tipoFreteML: 'full' })
+            setAddForm({ skuVariacao: '', plataformaId: '', custoEmbalagem: '', custoFrete: '', custoColeta: '', comissaoPct: '', impostoPct: '0.08', precoAtual: '', codigoAnuncio: '', tipoFreteML: 'full' })
             setError(''); setAddModal(true)
           }} className="btn-primary text-xs">
             <Plus size={13} /> Nova
@@ -301,6 +304,12 @@ function PrecificacaoContent() {
               </p>
             </div>
 
+            <div>
+              <label className="lbl">Código do anúncio</label>
+              <input className="inp" value={codigoAnuncioInput} onChange={e => setCodigoAnuncioInput(e.target.value)}
+                placeholder="Ex: MLB6620253832" />
+            </div>
+
             {error && <Alert type="error">{error}</Alert>}
             <div className="flex justify-end gap-2 pt-1">
               <button className="btn-ghost" onClick={() => setEditModal(null)}>Cancelar</button>
@@ -359,6 +368,8 @@ function PrecificacaoContent() {
           </div>
           <div><label className="lbl">Preço atual R$ (opcional)</label>
             <input className="inp" type="number" step="0.01" value={addForm.precoAtual} onChange={e => setAddForm(p => ({ ...p, precoAtual: e.target.value }))} placeholder="Deixe em branco para calcular depois" /></div>
+          <div><label className="lbl">Código do anúncio (opcional)</label>
+            <input className="inp" value={addForm.codigoAnuncio} onChange={e => setAddForm(p => ({ ...p, codigoAnuncio: e.target.value }))} placeholder="Ex: MLB6620253832" /></div>
           <div className="flex justify-end gap-2 pt-1">
             <button className="btn-ghost" onClick={() => setAddModal(false)}>Cancelar</button>
             <button className="btn-primary" onClick={saveAdd} disabled={saving}>
