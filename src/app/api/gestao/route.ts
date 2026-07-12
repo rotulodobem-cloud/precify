@@ -102,6 +102,11 @@ export async function GET(req: NextRequest) {
           variacoes: {
             where: { status: 'ativo' },
             include: {
+              // NOTA: este endpoint expunha "anuncios" antes; o campo foi
+              // removido junto com o model Anuncio. O painel externo que
+              // consome esta API pode precisar ser atualizado para ler
+              // "precificacoes" (formato diferente: inclui plataforma
+              // aninhada em vez de "canal" plano) em vez de "anuncios".
               precificacoes: {
                 include: { plataforma: true }
               }
