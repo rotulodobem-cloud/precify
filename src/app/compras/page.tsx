@@ -25,6 +25,7 @@ interface Compra {
   quantidade: number; custoTotal: number; custoUnitario: number; custoAnterior: number | null
   variacaoPct: number | null; statusVariacao: string | null; precoVenda: number | null
   margem: number | null; statusFinanceiro: string | null; fonte: string
+  numeroNF: string | null; numeroPedido: string | null
 }
 
 interface DashCompras {
@@ -38,11 +39,8 @@ interface DashCompras {
 
 interface Fornecedor { id: string; nome: string; contato?: string | null; obs?: string | null }
 
-const emptyF = {
-  dataCompra: new Date().toISOString().slice(0, 10),
-  skuPrincipal: '', nomeProduto: '', fornecedor: '',
-  quantidade: '', custoTotal: '', frete: '0', outrosCustos: '0', precoVenda: ''
-}
+const emptyItem = { skuPrincipal: '', nomeProduto: '', quantidade: '', custoTotal: '' }
+const emptyFormCompra = { dataCompra: new Date().toISOString().slice(0, 10), fornecedor: '', numeroNF: '', numeroPedido: '', frete: '0' }
 
 const emptyForn = { nome: '', contato: '', obs: '' }
 
@@ -99,14 +97,16 @@ export default function ComprasPage() {
   // Modais
   const [modal, setModal]         = useState(false)
   const [modalForn, setModalForn] = useState(false)
-  const [form, setForm]           = useState(emptyF)
+  const [formCompra, setFormCompra] = useState(emptyFormCompra)
+  const [itensCompra, setItensCompra] = useState([{ ...emptyItem }])
   const [formForn, setFormForn]   = useState(emptyForn)
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
   const [errorForn, setErrorForn] = useState('')
 
   // SKU lookup
-  const [skuLookup, setSkuLookup]   = useState<{ nome?: string; fornecedor?: string; custo?: number } | null>(null)
+  const [skuLookups, setSkuLookups] = useState<Record<number, { nome?: string; fornecedor?: string; custo?: number } | null>>({})
+  const [skuLoadingIdx, setSkuLoadingIdx] = useState<number | null>(null)
 
   // ── Estado das novas abas ─────────────────────────────────
   const [histMensal, setHistMensal]   = useState<HistoricoMensalData | null>(null)
@@ -131,7 +131,6 @@ export default function ComprasPage() {
   const [loadingLista, setLoadingLista] = useState(false)
   const [buscaRanking, setBuscaRanking]     = useState('')
   const [buscaMelhor, setBuscaMelhor]       = useState('')
-  const [skuLoading, setSkuLoading] = useState(false)
   const skuTimer = useRef<NodeJS.Timeout>()
 
   const loadFornecedores = useCallback(async () => {
@@ -156,43 +155,59 @@ export default function ComprasPage() {
 
   useEffect(() => { load(); loadFornecedores() }, [load, loadFornecedores])
 
-  // ── Lookup de SKU ao digitar ──────────────────────────────
-  const handleSkuChange = (val: string) => {
-    setForm(p => ({ ...p, skuPrincipal: val, nomeProduto: '' }))
-    setSkuLookup(null)
+  // ── Lookup de SKU ao digitar (por linha) ──────────────────
+  const handleItemSkuChange = (idx: number, val: string) => {
+    setItensCompra(prev => prev.map((it, i) => i === idx ? { ...it, skuPrincipal: val, nomeProduto: '' } : it))
+    setSkuLookups(prev => ({ ...prev, [idx]: null }))
     clearTimeout(skuTimer.current)
     if (val.length < 2) return
-    setSkuLoading(true)
+    setSkuLoadingIdx(idx)
     skuTimer.current = setTimeout(async () => {
       const r = await fetch(`/api/compras/sku?sku=${encodeURIComponent(val)}`)
       const d = await r.json()
-      setSkuLoading(false)
+      setSkuLoadingIdx(null)
       if (d?.produto || d?.ultimaCompra) {
         const nome = d.produto?.nome || d.ultimaCompra?.nomeProduto || ''
         const forn = d.produto?.fornecedorPrincipal || d.ultimaCompra?.fornecedor || ''
         const custo = d.produto?.custoPorKg || d.ultimaCompra?.custoUnitario || null
-        setSkuLookup({ nome, fornecedor: forn, custo })
-        setForm(p => ({
-          ...p,
-          nomeProduto: nome,
-          fornecedor: forn || p.fornecedor,
-        }))
+        setSkuLookups(prev => ({ ...prev, [idx]: { nome, fornecedor: forn, custo } }))
+        setItensCompra(prev => prev.map((it, i) => i === idx ? { ...it, nomeProduto: nome } : it))
+        setFormCompra(p => p.fornecedor ? p : { ...p, fornecedor: forn || p.fornecedor })
       }
     }, 400)
+  }
+
+  const addItemRow = () => setItensCompra(prev => [...prev, { ...emptyItem }])
+  const removeItemRow = (idx: number) => {
+    setItensCompra(prev => prev.filter((_, i) => i !== idx))
+    setSkuLookups(prev => { const n = { ...prev }; delete n[idx]; return n })
+  }
+
+  const somaCustoItens = itensCompra.reduce((s, it) => s + (parseFloat(it.custoTotal) || 0), 0)
+  const freteRateio = (custoTotalItem: string) => {
+    const freteTotal = parseFloat(formCompra.frete) || 0
+    const c = parseFloat(custoTotalItem) || 0
+    if (freteTotal <= 0 || somaCustoItens <= 0) return 0
+    return Math.round(freteTotal * (c / somaCustoItens) * 100) / 100
   }
 
   // ── Salvar compra ─────────────────────────────────────────
   const save = async () => {
     setSaving(true); setError('')
-    if (!form.skuPrincipal || !form.nomeProduto || !form.quantidade || !form.custoTotal) {
-      setError('SKU, produto, quantidade e custo total são obrigatórios')
-      setSaving(false); return
-    }
+    if (!formCompra.fornecedor) { setError('Fornecedor é obrigatório'); setSaving(false); return }
+    const itensValidos = itensCompra.filter(it => it.skuPrincipal && it.nomeProduto && it.quantidade && it.custoTotal)
+    if (!itensValidos.length) { setError('Adicione ao menos um produto com SKU, quantidade e custo total'); setSaving(false); return }
+
     const r = await fetch('/api/compras', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...formCompra, itens: itensValidos }),
     })
     if (!r.ok) { const d = await r.json(); setError(d.error ?? 'Erro'); setSaving(false); return }
-    setModal(false); setForm(emptyF); setSkuLookup(null); load(); setSaving(false)
+    setModal(false)
+    setFormCompra(emptyFormCompra)
+    setItensCompra([{ ...emptyItem }])
+    setSkuLookups({})
+    load(); setSaving(false)
   }
 
   // ── Salvar fornecedor ─────────────────────────────────────
@@ -206,13 +221,9 @@ export default function ComprasPage() {
   }
 
   const f  = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm(p => ({ ...p, [k]: e.target.value }))
+    setFormCompra(p => ({ ...p, [k]: e.target.value }))
   const ff = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setFormForn(p => ({ ...p, [k]: e.target.value }))
-
-  const custoUnit = form.quantidade && form.custoTotal
-    ? (parseFloat(form.custoTotal) / parseFloat(form.quantidade))
-    : null
 
   const abas: { id: Aba; label: string; icon: React.ElementType; grupo?: string }[] = [
     { id: 'dashboard',    label: 'Resumo',           icon: BarChart2 },
@@ -383,7 +394,7 @@ export default function ComprasPage() {
           <button onClick={() => { setFormForn(emptyForn); setErrorForn(''); setModalForn(true) }} className="btn-ghost text-xs">
             <UserPlus size={13} /> Novo fornecedor
           </button>
-          <button onClick={() => { setForm(emptyF); setSkuLookup(null); setError(''); setModal(true) }} className="btn-primary">
+          <button onClick={() => { setFormCompra(emptyFormCompra); setItensCompra([{ ...emptyItem }]); setSkuLookups({}); setError(''); setModal(true) }} className="btn-primary">
             <Plus size={14} /> Registrar compra
           </button>
         </div>
@@ -1265,76 +1276,102 @@ export default function ComprasPage() {
       )}
 
       {/* ── MODAL REGISTRAR COMPRA ── */}
-      <Modal title="Registrar compra" open={modal} onClose={() => { setModal(false); setSkuLookup(null) }}>
+      <Modal title="Registrar compra" open={modal} onClose={() => setModal(false)} wide>
         <div className="space-y-3">
           {error && <Alert type="error">{error}</Alert>}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="lbl">Data *</label>
-              <input className="inp" type="date" value={form.dataCompra} onChange={f('dataCompra')} />
+              <input className="inp" type="date" value={formCompra.dataCompra} onChange={f('dataCompra')} />
             </div>
             <div>
-              <label className="lbl">SKU Principal *</label>
-              <div className="relative">
-                <input className="inp pr-7" value={form.skuPrincipal}
-                  onChange={e => handleSkuChange(e.target.value)} placeholder="Ex: 242" />
-                {skuLoading && <div className="absolute right-2 top-2.5"><Spinner size={14} /></div>}
-              </div>
+              <label className="lbl">Fornecedor *</label>
+              <input className="inp" list="forn-list" value={formCompra.fornecedor}
+                onChange={f('fornecedor')} placeholder="Selecione ou digite" />
+              <datalist id="forn-list">
+                {fornecedores.map(fn => <option key={fn.id} value={fn.nome} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className="lbl">Nº NF ou Pedido</label>
+              <input className="inp" value={formCompra.numeroNF} onChange={f('numeroNF')} placeholder="Ex: 12345" />
             </div>
           </div>
 
-          {/* Info do produto encontrado */}
-          {skuLookup && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-xs text-indigo-700 flex items-center gap-2">
-              <span>✓ Produto encontrado:</span>
-              <span className="font-semibold">{skuLookup.nome}</span>
-              {skuLookup.custo && <span className="text-indigo-500">· último custo: {num(skuLookup.custo)}</span>}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="lbl mb-0">Produtos</label>
+              <button onClick={addItemRow} className="btn-ghost text-xs"><Plus size={12} /> Adicionar produto</button>
             </div>
-          )}
+            {itensCompra.map((item, idx) => {
+              const lookup = skuLookups[idx]
+              const rateio = freteRateio(item.custoTotal)
+              return (
+                <div key={idx} className="border border-gray-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <div className="relative">
+                        <label className="lbl">SKU Principal *</label>
+                        <input className="inp pr-7" value={item.skuPrincipal}
+                          onChange={e => handleItemSkuChange(idx, e.target.value)} placeholder="Ex: 242" />
+                        {skuLoadingIdx === idx && <div className="absolute right-2 top-7"><Spinner size={14} /></div>}
+                      </div>
+                      <div>
+                        <label className="lbl">Nome do produto *</label>
+                        <input className="inp" value={item.nomeProduto}
+                          onChange={e => setItensCompra(prev => prev.map((it, i) => i === idx ? { ...it, nomeProduto: e.target.value } : it))}
+                          placeholder={lookup ? '' : 'Digite o nome do produto'} />
+                      </div>
+                    </div>
+                    {itensCompra.length > 1 && (
+                      <button onClick={() => removeItemRow(idx)} className="mt-6 text-gray-300 hover:text-red-600">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+
+                  {lookup && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5 text-xs text-indigo-700">
+                      ✓ {lookup.nome} {lookup.custo && <span className="text-indigo-500">· último custo: {num(lookup.custo)}</span>}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="lbl">Quantidade (kg/un) *</label>
+                      <input className="inp" type="number" step="0.01" value={item.quantidade}
+                        onChange={e => setItensCompra(prev => prev.map((it, i) => i === idx ? { ...it, quantidade: e.target.value } : it))} />
+                    </div>
+                    <div>
+                      <label className="lbl">Custo total R$ *</label>
+                      <input className="inp" type="number" step="0.01" value={item.custoTotal}
+                        onChange={e => setItensCompra(prev => prev.map((it, i) => i === idx ? { ...it, custoTotal: e.target.value } : it))} />
+                    </div>
+                    <div>
+                      <label className="lbl">Frete rateado</label>
+                      <div className="inp bg-gray-50 text-gray-500">{brl(rateio)}</div>
+                    </div>
+                  </div>
+                  {item.quantidade && item.custoTotal && parseFloat(item.quantidade) > 0 && (
+                    <p className="text-xs text-indigo-600">
+                      Custo unitário: <strong>{num(parseFloat(item.custoTotal) / parseFloat(item.quantidade))}</strong>
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
 
           <div>
-            <label className="lbl">Nome do produto *</label>
-            <input className="inp" value={form.nomeProduto} onChange={f('nomeProduto')}
-              placeholder={skuLookup ? '' : 'Digite o nome do produto'} />
-          </div>
-
-          <div>
-            <label className="lbl">Fornecedor</label>
-            <input className="inp" list="forn-list" value={form.fornecedor}
-              onChange={f('fornecedor')} placeholder="Selecione ou digite" />
-            <datalist id="forn-list">
-              {fornecedores.map(fn => <option key={fn.id} value={fn.nome} />)}
-            </datalist>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="lbl">Quantidade (kg/un) *</label>
-              <input className="inp" type="number" step="0.01" value={form.quantidade} onChange={f('quantidade')} />
-            </div>
-            <div>
-              <label className="lbl">Custo total R$ *</label>
-              <input className="inp" type="number" step="0.01" value={form.custoTotal} onChange={f('custoTotal')} />
-            </div>
-          </div>
-
-          {custoUnit !== null && custoUnit > 0 && (
-            <div className="bg-indigo-50 rounded-lg px-3 py-2 text-sm text-indigo-700">
-              Custo unitário calculado: <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4 }).format(custoUnit)}</strong>
-            </div>
-          )}
-
-          <div className="grid grid-cols-3 gap-2">
-            <div><label className="lbl">Frete R$</label><input className="inp" type="number" step="0.01" value={form.frete} onChange={f('frete')} /></div>
-            <div><label className="lbl">Outros</label><input className="inp" type="number" step="0.01" value={form.outrosCustos} onChange={f('outrosCustos')} /></div>
-            <div><label className="lbl">Preço venda</label><input className="inp" type="number" step="0.01" value={form.precoVenda} onChange={f('precoVenda')} /></div>
+            <label className="lbl">Frete total da compra R$ (dividido proporcionalmente entre os produtos acima)</label>
+            <input className="inp" type="number" step="0.01" value={formCompra.frete} onChange={f('frete')} />
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
-            <button className="btn-ghost" onClick={() => { setModal(false); setSkuLookup(null) }}>Cancelar</button>
+            <button className="btn-ghost" onClick={() => setModal(false)}>Cancelar</button>
             <button className="btn-primary" onClick={save} disabled={saving}>
-              {saving ? <Spinner size={13} /> : null} Registrar
+              {saving ? <Spinner size={13} /> : null} Registrar {itensCompra.length > 1 ? `(${itensCompra.length} produtos)` : ''}
             </button>
           </div>
         </div>

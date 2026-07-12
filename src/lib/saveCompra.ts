@@ -1,10 +1,60 @@
 import db from '@/lib/db'
 import { calcCustoVariacao, calcPrecificacaoComFreteML, round2 } from '@/lib/calculos'
 
+export async function recalcularVariacoesEPrecificacoes(skuPrincipal: string, custoUnit: number) {
+  const variacoes = await db.variacao.findMany({
+    where: { skuPrincipal },
+    include: { precificacoes: { include: { plataforma: true } } },
+  })
+
+  for (const v of variacoes) {
+    let novoCustoCalc = v.custoCalculado
+    let novoCustoTotal = v.custoTotal
+
+    if (v.pesoGramas) {
+      novoCustoCalc = round2(calcCustoVariacao(custoUnit, v.pesoGramas, 0))
+      novoCustoTotal = round2(novoCustoCalc + (v.custoAdicional ?? 0))
+    } else {
+      novoCustoCalc = custoUnit
+      novoCustoTotal = round2(custoUnit + (v.custoAdicional ?? 0))
+    }
+
+    await db.variacao.update({
+      where: { id: v.id },
+      data: { custoCalculado: novoCustoCalc, custoTotal: novoCustoTotal },
+    })
+
+    for (const prec of v.precificacoes) {
+      const isML = prec.plataforma.slug === 'ml'
+      const tipoFreteML = (prec as Record<string, unknown>).tipoFreteML as string ?? 'full'
+
+      const calc = calcPrecificacaoComFreteML({
+        custoProduto: novoCustoTotal ?? novoCustoCalc ?? 0,
+        custoEmbalagem: prec.custoEmbalagem, custoFrete: prec.custoFrete,
+        custoColeta: prec.custoColeta, comissaoPct: prec.comissaoPct,
+        impostoPct: prec.impostoPct, precoAtual: prec.precoAtual,
+        isML, tipoFreteML, pesoGramas: v.pesoGramas,
+      })
+
+      await db.precificacao.update({
+        where: { id: prec.id },
+        data: {
+          custoFrete: calc.custoFrete, custoTotalCalc: calc.custoTotalCalc,
+          precoMinimo: calc.precoMinimo, precoIdeal: calc.precoIdeal,
+          precoMaximo: calc.precoMaximo, precoPromocional: calc.precoPromocional,
+          lucroBruto: calc.lucroBruto, margemAtual: calc.margemAtual,
+          statusMargem: calc.statusMargem,
+        },
+      })
+    }
+  }
+}
+
 export async function saveCompra(data: {
   dataCompra: string; skuPrincipal: string; nomeProduto: string; fornecedor: string
   quantidade: number; custoTotal: number; frete?: number; outrosCustos?: number
   precoVenda?: number | null; impostoPct?: number; fonte?: string
+  numeroNF?: string; numeroPedido?: string
 }) {
   const frete     = data.frete ?? 0
   const outros    = data.outrosCustos ?? 0
@@ -52,52 +102,7 @@ export async function saveCompra(data: {
     },
   })
 
-  const variacoes = await db.variacao.findMany({
-    where: { skuPrincipal: data.skuPrincipal },
-    include: { precificacoes: { include: { plataforma: true } } },
-  })
-
-  for (const v of variacoes) {
-    let novoCustoCalc = v.custoCalculado
-    let novoCustoTotal = v.custoTotal
-
-    if (v.pesoGramas) {
-      novoCustoCalc = round2(calcCustoVariacao(custoUnit, v.pesoGramas, 0))
-      novoCustoTotal = round2(novoCustoCalc + (v.custoAdicional ?? 0))
-    } else {
-      novoCustoCalc = custoUnit
-      novoCustoTotal = round2(custoUnit + (v.custoAdicional ?? 0))
-    }
-
-    await db.variacao.update({
-      where: { id: v.id },
-      data: { custoCalculado: novoCustoCalc, custoTotal: novoCustoTotal },
-    })
-
-    for (const prec of v.precificacoes) {
-      const isML = prec.plataforma.slug === 'ml'
-      const tipoFreteML = (prec as Record<string, unknown>).tipoFreteML as string ?? 'full'
-
-      const calc = calcPrecificacaoComFreteML({
-        custoProduto: novoCustoTotal ?? novoCustoCalc ?? 0,
-        custoEmbalagem: prec.custoEmbalagem, custoFrete: prec.custoFrete,
-        custoColeta: prec.custoColeta, comissaoPct: prec.comissaoPct,
-        impostoPct: prec.impostoPct, precoAtual: prec.precoAtual,
-        isML, tipoFreteML, pesoGramas: v.pesoGramas,
-      })
-
-      await db.precificacao.update({
-        where: { id: prec.id },
-        data: {
-          custoFrete: calc.custoFrete, custoTotalCalc: calc.custoTotalCalc,
-          precoMinimo: calc.precoMinimo, precoIdeal: calc.precoIdeal,
-          precoMaximo: calc.precoMaximo, precoPromocional: calc.precoPromocional,
-          lucroBruto: calc.lucroBruto, margemAtual: calc.margemAtual,
-          statusMargem: calc.statusMargem,
-        },
-      })
-    }
-  }
+  await recalcularVariacoesEPrecificacoes(data.skuPrincipal, custoUnit)
 
   const dataFinal = data.dataCompra.includes('T')
     ? new Date(data.dataCompra)
@@ -114,6 +119,8 @@ export async function saveCompra(data: {
       precoVenda: data.precoVenda ?? null,
       impostoPct: imposto, margem, statusFinanceiro,
       fonte: data.fonte ?? 'manual',
+      numeroNF: data.numeroNF || null,
+      numeroPedido: data.numeroPedido || null,
     },
   })
 }

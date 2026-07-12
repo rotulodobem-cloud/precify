@@ -122,6 +122,8 @@ model Compra {
   margem           Float?
   statusFinanceiro String?
   fonte            String   @default("manual")
+  numeroNF         String?
+  numeroPedido     String?
   createdAt        DateTime @default(now())
 }
 
