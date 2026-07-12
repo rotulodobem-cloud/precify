@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Search, Calculator, Save, RefreshCw, CheckCircle2, Info } from 'lucide-react'
 import { Spinner, Alert } from '@/components/ui'
 
@@ -68,23 +68,42 @@ interface Produto {
   variacoes: Variacao[]
 }
 
-const CANAIS_PADRAO: Canal[] = [
+const CANAIS_ML: Canal[] = [
   { key: 'ml_full',     label: 'ML FULL',     comissao: 0.14, imposto: 0.0829, embalagem: 0,    coleta: 0.60, taxaFixa: 0,    tipoFrete: 'full' },
   { key: 'ml_classico', label: 'ML Clássico', comissao: 0.14, imposto: 0.0829, embalagem: 0.60, coleta: 0,    taxaFixa: 1.25, tipoFrete: 'classico' },
-  { key: 'shopee',      label: 'Shopee',      comissao: 0.20, imposto: 0.0829, embalagem: 0.60, coleta: 0,    taxaFixa: 4.00, tipoFrete: 'fixo' },
 ]
+
+interface PlataformaAPI {
+  id: string; nome: string; slug: string; comissaoPct: number; taxaFixa: number
+  custoFrete: number; custoColeta: number; custoEmbalagem: number; impostoPct: number; ativa: boolean
+}
 
 export default function CalculadoraPage() {
   const [q, setQ]               = useState('')
   const [produto, setProduto]   = useState<Produto | null>(null)
   const [loading, setLoading]   = useState(false)
-  const [canais, setCanais]     = useState<Canal[]>(CANAIS_PADRAO)
+  const [plataformas, setPlataformas] = useState<PlataformaAPI[]>([])
+  const [canais, setCanais]     = useState<Canal[]>(CANAIS_ML)
   const [resultados, setResultados] = useState<ResultadoVariacao[]>([])
   const [calculado, setCalculado]   = useState(false)
   const [salvando, setSalvando]     = useState<Record<string, string>>({})
   const [salvos, setSalvos]         = useState<Record<string, string>>({})
   const [error, setError]           = useState('')
   const timer = useRef<NodeJS.Timeout>()
+
+  // ── Buscar plataformas cadastradas (Shopee, TikTok Shop, etc.) ──
+  useEffect(() => {
+    fetch('/api/plataformas').then(r => r.json()).then((plats: PlataformaAPI[]) => {
+      setPlataformas(plats)
+      const dinamicos: Canal[] = plats
+        .filter(p => p.ativa && p.slug !== 'ml')
+        .map(p => ({
+          key: p.slug, label: p.nome, comissao: p.comissaoPct, imposto: p.impostoPct,
+          embalagem: p.custoEmbalagem, coleta: p.custoColeta, taxaFixa: p.taxaFixa, tipoFrete: 'fixo',
+        }))
+      setCanais([...CANAIS_ML, ...dinamicos])
+    })
+  }, [])
 
   // ── Buscar produto ou kit ─────────────────────────────────
   const buscarProduto = useCallback(async (sku: string) => {
@@ -182,37 +201,53 @@ export default function CalculadoraPage() {
     setCalculado(true)
   }
 
-  // ── Salvar como anúncio ───────────────────────────────────
-  const salvarAnuncio = async (rv: ResultadoVariacao, col: ResultadoVariacao['canais'][0]) => {
+  // ── Salvar como precificação ───────────────────────────────
+  const plataformaIdPorCanal = (canalKey: string): string | null => {
+    if (canalKey === 'ml_full' || canalKey === 'ml_classico') {
+      return plataformas.find(p => p.slug === 'ml')?.id ?? null
+    }
+    return plataformas.find(p => p.slug === canalKey)?.id ?? null
+  }
+
+  const salvarPrecificacao = async (rv: ResultadoVariacao, col: ResultadoVariacao['canais'][0]) => {
     const key = `${rv.skuVariacao}_${col.canal.key}`
     setSalvando(p => ({ ...p, [key]: 'Salvo!' }))
     setError('')
 
-    const r = await fetch('/api/anuncios', {
+    const plataformaId = plataformaIdPorCanal(col.canal.key)
+    if (!plataformaId) {
+      setError(`Plataforma "${col.canal.label}" não encontrada para salvar. Cadastre-a em Plataformas.`)
+      setSalvando(p => ({ ...p, [key]: '' }))
+      return
+    }
+
+    const tipoFreteML = col.canal.tipoFrete === 'full' ? 'full'
+      : col.canal.tipoFrete === 'classico' ? 'flex'
+      : 'fixo'
+
+    const r = await fetch('/api/precificacao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         skuVariacao:    rv.skuVariacao,
-        canal:          col.canal.key,
+        plataformaId,
         custoEmbalagem: col.canal.embalagem,
         custoColeta:    col.canal.coleta,
-        custoFrete:     col.frete,
+        custoFrete:     col.frete || col.canal.taxaFixa,
         comissaoPct:    col.canal.comissao,
         impostoPct:     col.canal.imposto,
         precoAtual:     col.precoPromocional, // sobe com preço promocional
-        ativo:          true,
+        tipoFreteML,
       }),
     })
 
     const text = await r.text()
     if (!r.ok) {
-      let msg = 'Erro ao salvar anúncio'
+      let msg = 'Erro ao salvar precificação'
       try { msg = JSON.parse(text)?.error ?? msg } catch {}
       setError(msg)
     } else {
-      let atualizado = false
-      try { atualizado = JSON.parse(text)?._atualizado ?? false } catch {}
-      setSalvos(p => ({ ...p, [key]: atualizado ? 'Atualizado!' : 'Salvo!' }))
+      setSalvos(p => ({ ...p, [key]: 'Salvo!' }))
       setTimeout(() => setSalvos(p => ({ ...p, [key]: '' })), 4000)
     }
     setSalvando(p => ({ ...p, [key]: '' }))
@@ -220,7 +255,7 @@ export default function CalculadoraPage() {
 
   const salvarTodos = async (rv: ResultadoVariacao) => {
     for (const col of rv.canais) {
-      await salvarAnuncio(rv, col)
+      await salvarPrecificacao(rv, col)
     }
   }
 
@@ -277,7 +312,7 @@ export default function CalculadoraPage() {
               {canais.map((c, i) => (
                 <div key={c.key}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`badge text-xs font-semibold ${c.key === 'shopee' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    <span className={`badge text-xs font-semibold ${c.key.startsWith('ml_') ? 'bg-yellow-100 text-yellow-800' : 'bg-slate-100 text-slate-700'}`}>
                       {c.label}
                     </span>
                   </div>
@@ -354,75 +389,67 @@ export default function CalculadoraPage() {
                 </div>
               </div>
 
-              {/* Tabela por canal */}
-              <div className="overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="tbl-head">
-                    <tr>
-                      <th className="th">Canal</th>
-                      <th className="th-r">Frete</th>
-                      <th className="th-r">Custo total</th>
-                      <th className="th-r text-amber-600">Mínimo (20%)</th>
-                      <th className="th-r text-indigo-600">Ideal (25%) ★</th>
-                      <th className="th-r text-emerald-600">Máximo (30%)</th>
-                      <th className="th-r text-purple-600">Promoção</th>
-                      <th className="th text-center">Salvar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {rv.canais.map(col => {
-                      const key = `${rv.skuVariacao}_${col.canal.key}`
-                      const isSalvando = salvando[key]
-                      const isSalvo    = !!salvos[key]
-                      return (
-                        <tr key={col.canal.key} className="tr-row">
-                          <td className="td">
-                            <span className={`badge text-xs font-semibold ${col.canal.key === 'shopee' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {col.canal.label}
-                            </span>
-                            <div className="text-[10px] text-gray-400 mt-0.5">
-                              {pct(col.canal.comissao)} comissão · {pct(col.canal.imposto)} imposto
-                              {col.canal.embalagem > 0 && ` · embal. ${brl(col.canal.embalagem)}`}
-                              {col.canal.coleta > 0 && ` · coleta ${brl(col.canal.coleta)}`}
-                              {col.canal.taxaFixa > 0 && ` · taxa fixa ${brl(col.canal.taxaFixa)}`}
-                            </div>
-                          </td>
-                          <td className="td-r text-xs text-indigo-600 font-medium">{brl(col.frete)}</td>
-                          <td className="td-r text-xs font-semibold">{brl(col.custoFinal)}</td>
-                          <td className="td-r">
-                            <div className="font-semibold text-amber-700">{brl(col.precoMinimo)}</div>
-                            <div className="text-[10px] text-gray-400">margem 20%</div>
-                          </td>
-                          <td className="td-r bg-indigo-50/50">
-                            <div className="font-bold text-indigo-700 text-base">{brl(col.precoIdeal)}</div>
-                            <div className="text-[10px] text-gray-400">margem 25%</div>
-                          </td>
-                          <td className="td-r">
-                            <div className="font-semibold text-emerald-700">{brl(col.precoMaximo)}</div>
-                            <div className="text-[10px] text-gray-400">margem 30%</div>
-                          </td>
-                          <td className="td-r">
-                            <div className="font-bold text-purple-700 text-base">{brl(col.precoPromocional)}</div>
-                            <div className="text-[10px] text-gray-400">ideal × 1,45</div>
-                          </td>
-                          <td className="td text-center">
-                            {isSalvo ? (
-                              <span className="text-emerald-500 flex items-center justify-center gap-1 text-xs">
-                                <CheckCircle2 size={14} /> {salvos[key]}
-                              </span>
-                            ) : (
-                              <button onClick={() => salvarAnuncio(rv, col)} disabled={!!isSalvando}
-                                className="btn-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200">
-                                {isSalvando ? <Spinner size={12} /> : <Save size={12} />}
-                                {isSalvando ? '…' : 'Salvar'}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+              {/* Cartões por canal */}
+              <div className="divide-y divide-gray-100">
+                {rv.canais.map(col => {
+                  const key = `${rv.skuVariacao}_${col.canal.key}`
+                  const isSalvando = salvando[key]
+                  const isSalvo    = !!salvos[key]
+                  return (
+                    <div key={col.canal.key} className="p-4">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                        <div>
+                          <span className={`badge text-xs font-semibold ${col.canal.key.startsWith('ml_') ? 'bg-yellow-100 text-yellow-800' : 'bg-slate-100 text-slate-700'}`}>
+                            {col.canal.label}
+                          </span>
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            {pct(col.canal.comissao)} comissão · {pct(col.canal.imposto)} imposto
+                            {col.canal.embalagem > 0 && ` · embal. ${brl(col.canal.embalagem)}`}
+                            {col.canal.coleta > 0 && ` · coleta ${brl(col.canal.coleta)}`}
+                            {col.canal.taxaFixa > 0 && ` · taxa fixa ${brl(col.canal.taxaFixa)}`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-600">
+                          <span>Frete: <strong className="text-indigo-600">{brl(col.frete)}</strong></span>
+                          <span>Custo total: <strong className="text-gray-800">{brl(col.custoFinal)}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="rounded-lg bg-amber-50 p-2 text-center">
+                          <div className="text-[10px] text-amber-600 font-medium">Mínimo (20%)</div>
+                          <div className="font-semibold text-amber-700">{brl(col.precoMinimo)}</div>
+                        </div>
+                        <div className="rounded-lg bg-indigo-50 p-2 text-center">
+                          <div className="text-[10px] text-indigo-600 font-medium">Ideal (25%) ★</div>
+                          <div className="font-bold text-indigo-700 text-base">{brl(col.precoIdeal)}</div>
+                        </div>
+                        <div className="rounded-lg bg-emerald-50 p-2 text-center">
+                          <div className="text-[10px] text-emerald-600 font-medium">Máximo (30%)</div>
+                          <div className="font-semibold text-emerald-700">{brl(col.precoMaximo)}</div>
+                        </div>
+                        <div className="rounded-lg bg-purple-50 p-2 text-center">
+                          <div className="text-[10px] text-purple-600 font-medium">Promoção</div>
+                          <div className="font-bold text-purple-700 text-base">{brl(col.precoPromocional)}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex justify-end">
+                        {isSalvo ? (
+                          <span className="text-emerald-500 flex items-center gap-1 text-xs">
+                            <CheckCircle2 size={14} /> {salvos[key]}
+                          </span>
+                        ) : (
+                          <button onClick={() => salvarPrecificacao(rv, col)} disabled={!!isSalvando}
+                            className="btn-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200">
+                            {isSalvando ? <Spinner size={12} /> : <Save size={12} />}
+                            {isSalvando ? '…' : 'Salvar'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Nota sobre preço promocional */}
