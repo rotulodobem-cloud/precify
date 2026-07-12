@@ -4,8 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
-  Zap, Truck, Megaphone, Settings, Calculator,
-  SlidersHorizontal, Play, Gift
+  Zap, Truck, Megaphone, Settings, Calculator
 } from 'lucide-react'
 
 const links = [
@@ -16,10 +15,6 @@ const links = [
   { href: '/anuncios',       label: 'Anúncios',        icon: Megaphone },
   { href: '/precificacao',   label: 'Precificação',    icon: Tag },
   { href: '/frete',          label: 'Frete ML',        icon: Truck },
-  { divider: true,           label: 'Multicanal' },
-  { href: '/configuracao-multicanal', label: 'Config. Multicanal',     icon: SlidersHorizontal },
-  { href: '/lista-acao',              label: 'Lista de Ação',          icon: Play },
-  { href: '/simulador-frete-gratis',  label: 'Simulador Frete Grátis', icon: Gift },
   { divider: true,           label: 'Cadastros' },
   { href: '/produtos',       label: 'Produtos',        icon: Package },
   { href: '/kits',           label: 'Kits',            icon: Layers },
