@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Modal, Alert, Spinner } from '@/components/ui'
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
@@ -31,6 +31,12 @@ export default function PlataformasPage() {
     setModal(false); load(); setSaving(false)
   }
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(p => ({ ...p, [k]: e.target.value }))
+  const remover = async (p: Plataforma) => {
+    if (!confirm(`Excluir a plataforma "${p.nome}"? Isso apaga também todo o histórico de precificação ligado a ela. Essa ação não pode ser desfeita.`)) return
+    const r = await fetch(`/api/plataformas/${p.id}`, { method: 'DELETE' })
+    if (!r.ok) { alert('Erro ao excluir plataforma'); return }
+    load()
+  }
 
   // Simulação de preço com custo R$10
   const sim = (com: string, imp: string) => {
@@ -61,7 +67,10 @@ export default function PlataformasPage() {
                   </div>
                   <div><div className="font-semibold text-gray-900">{p.nome}</div><div className="text-xs text-gray-400">/{p.slug}</div></div>
                 </div>
-                <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={15} /></button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={15} /></button>
+                  <button onClick={() => remover(p)} className="text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={15} /></button>
+                </div>
               </div>
               <div className="space-y-1.5 text-sm">
                 {[['Comissão', pct(p.comissaoPct)], ['Taxa fixa', brl(p.taxaFixa)], ['Embalagem', brl(p.custoEmbalagem)], ['Frete médio', brl(p.custoFrete)], ['Imposto s/ receita', pct(p.impostoPct)]].map(([k, v]) => (
