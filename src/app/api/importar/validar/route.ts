@@ -24,11 +24,11 @@ export async function POST(req: NextRequest) {
         select: { skuPrincipal: true, nome: true, custoPorKg: true },
       })
 
-      // Buscar último preço de venda do anúncio
-      const ultimoAnuncio = await db.anuncio.findFirst({
+      // Buscar último preço de venda conhecido
+      const ultimaPrecificacao = await db.precificacao.findFirst({
         where: { variacao: { skuPrincipal: linha.skuInformado.trim() } },
         orderBy: { updatedAt: 'desc' },
-        select: { precoAtual: true, canal: true },
+        select: { precoAtual: true, plataforma: { select: { nome: true } } },
       })
 
       resultado.push({
@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
         skuSugerido: produto?.skuPrincipal ?? null,
         nomeCadastrado: produto?.nome ?? null,
         custoPorKg: produto?.custoPorKg ?? null,
-        precoVenda: ultimoAnuncio?.precoAtual ?? null,
-        canalPreco: ultimoAnuncio?.canal ?? null,
+        precoVenda: ultimaPrecificacao?.precoAtual ?? null,
+        canalPreco: ultimaPrecificacao?.plataforma.nome ?? null,
         sugestoes: [],
       })
       continue
@@ -66,13 +66,13 @@ export async function POST(req: NextRequest) {
     let precoVenda = null
     let canalPreco = null
     if (sugestoes.length > 0) {
-      const ultimoAnuncio = await db.anuncio.findFirst({
+      const ultimaPrecificacao = await db.precificacao.findFirst({
         where: { variacao: { skuPrincipal: sugestoes[0].skuPrincipal } },
         orderBy: { updatedAt: 'desc' },
-        select: { precoAtual: true, canal: true },
+        select: { precoAtual: true, plataforma: { select: { nome: true } } },
       })
-      precoVenda = ultimoAnuncio?.precoAtual ?? null
-      canalPreco = ultimoAnuncio?.canal ?? null
+      precoVenda = ultimaPrecificacao?.precoAtual ?? null
+      canalPreco = ultimaPrecificacao?.plataforma.nome ?? null
     }
 
     resultado.push({
