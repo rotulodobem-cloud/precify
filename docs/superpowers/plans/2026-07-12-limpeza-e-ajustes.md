@@ -762,7 +762,138 @@ Depois do deploy em produção: acessar `/plataformas`, localizar o card "Magalu
 
 ---
 
-### Task 9: Verificação final e deploy
+### Task 9: Busca por nome também na Calculadora
+
+**Contexto:** confirmado com a usuária — a página dedicada "Busca por SKU" (`/busca`) já busca por SKU e por nome (via `/api/busca`). Mas o campo de busca **dentro da Calculadora** usa `GET /api/produtos/[id]`, que só faz `findUnique` por `skuPrincipal` exato — não encontra nada se ela digitar um nome de produto ali. Trocar para usar `/api/busca` (mesma rota fuzzy já usada em `/busca`), com uma lista de sugestões quando houver mais de um resultado.
+
+**Files:**
+- Modify: `src/app/calculadora/page.tsx`
+
+**Interfaces:**
+- Consumes: `GET /api/busca?q=...` → `{ results: Produto[] }` (rota já existente, `src/app/api/busca/route.ts`, retorna produtos com `variacoes` já incluídas — mesmo formato usado por `GET /api/produtos/[id]`).
+
+- [ ] **Step 1: Adicionar state para as sugestões de busca**
+
+Logo abaixo de `const [loading, setLoading]   = useState(false)`, adicionar:
+```ts
+  const [sugestoes, setSugestoes] = useState<Produto[]>([])
+```
+
+- [ ] **Step 2: Trocar `buscarProduto` para usar `/api/busca` (SKU ou nome)**
+
+Substituir a função `buscarProduto` inteira por:
+
+```ts
+  const buscarProduto = useCallback(async (q: string) => {
+    if (q.length < 2) { setProduto(null); setSugestoes([]); setResultados([]); setCalculado(false); return }
+    setLoading(true)
+
+    const rBusca = await fetch(`/api/busca?q=${encodeURIComponent(q)}`)
+    const { results } = rBusca.ok ? await rBusca.json() : { results: [] }
+
+    if (results.length === 1) {
+      setProduto(results[0])
+      setSugestoes([])
+      setResultados([])
+      setCalculado(false)
+      setLoading(false)
+      return
+    }
+
+    if (results.length > 1) {
+      setProduto(null)
+      setSugestoes(results)
+      setResultados([])
+      setCalculado(false)
+      setLoading(false)
+      return
+    }
+
+    // Nada encontrado por SKU/nome — tentar como kit (busca exata)
+    setSugestoes([])
+    const rKit = await fetch(`/api/kits/${encodeURIComponent(q)}`)
+    if (rKit.ok) {
+      const kit = await rKit.json()
+      const kitComoProduto = {
+        skuPrincipal: kit.skuKit,
+        nome: kit.nome,
+        categoria: kit.categoria,
+        custoAtualizado: kit.custoTotal,
+        isKit: true,
+        variacoes: [{
+          skuVariacao: kit.skuKit + '-OKit',
+          nomeVariacao: kit.nome,
+          pesoGramas: null,
+          custoTotal: kit.custoTotal,
+          custoCalculado: kit.custoTotal,
+          status: 'ativo',
+        }],
+      }
+      setProduto(kitComoProduto as any)
+      setResultados([])
+      setCalculado(false)
+    } else {
+      setProduto(null)
+    }
+    setLoading(false)
+  }, [])
+
+  const selecionarSugestao = (p: Produto) => {
+    setProduto(p)
+    setSugestoes([])
+    setResultados([])
+    setCalculado(false)
+  }
+```
+
+- [ ] **Step 3: Atualizar o placeholder e mostrar a lista de sugestões**
+
+No painel de busca, trocar o placeholder do input:
+```tsx
+              <input className="inp pl-9 pr-8" value={q} onChange={e => handleQ(e.target.value)}
+                placeholder="Digite o SKU ou nome do produto…" autoFocus />
+```
+
+Logo depois do bloco `{produto && (...)}` que mostra o card do produto encontrado, e antes de `{q.length >= 2 && !produto && !loading && (...)}`, adicionar a lista de sugestões:
+
+```tsx
+            {sugestoes.length > 0 && (
+              <div className="mt-3 border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
+                {sugestoes.map(s => (
+                  <button key={s.skuPrincipal} onClick={() => selecionarSugestao(s)}
+                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 transition-colors">
+                    <div className="text-sm font-medium text-gray-800">{s.nome}</div>
+                    <div className="text-xs text-gray-400">{s.categoria} · SKU {s.skuPrincipal}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+```
+
+E atualizar a condição da mensagem de "não encontrado" para não aparecer quando há sugestões:
+```tsx
+            {q.length >= 2 && !produto && !loading && sugestoes.length === 0 && (
+              <p className="text-xs text-red-500 mt-2">Nenhum produto encontrado com esse SKU ou nome.</p>
+            )}
+```
+
+- [ ] **Step 4: Verificar**
+
+Run: `npx tsc --noEmit`
+Expected: sem erros em `calculadora/page.tsx`.
+
+Verificação manual (`npm run dev`): digitar parte do **nome** de um produto (não o SKU) no campo de busca da Calculadora — deve aparecer a lista de sugestões (ou selecionar direto, se só houver um resultado). Digitar um SKU exato continua funcionando como antes.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/app/calculadora/page.tsx
+git commit -m "Calculadora passa a buscar produto por nome, alem do SKU exato"
+```
+
+---
+
+### Task 10: Verificação final e deploy
 
 **Files:** nenhum.
 
@@ -796,8 +927,10 @@ Acompanhar o deploy automático dado o push (aba Deployments do serviço "precif
 - Item 3 (TikTok + Calculadora via Plataformas) → Tasks 3, 4. ✅ (usando a abordagem híbrida ML-fixo + Plataformas-dinâmicas, confirmada com a usuária depois da descoberta de que "Mercado Livre" é um único registro)
 - Item 4 (layout da Calculadora) → Task 4, Step 4. ✅ Print da usuária confirmou que o problema real era a tabela de 8 colunas exigindo rolagem lateral (não variações lado a lado, como a formulação original do spec sugeria) — corrigido trocando a tabela por cartões empilhados por canal com os preços num grid que quebra linha, sem scroll horizontal.
 - Item 5 (excluir Magalu + botão excluir Plataformas) → Task 8. ✅
-- Item extra descoberto durante o levantamento de arquivos: `importar/validar` dependia de `Anuncio` → Task 2 (não estava no spec original, adicionado por necessidade técnica).
+- Itens extras descobertos durante a conversa e o levantamento de arquivos (não estavam no spec original):
+  - `importar/validar` dependia de `Anuncio` → Task 2 (necessidade técnica, achado ao mapear arquivos).
+  - Busca por nome não funcionava dentro da Calculadora (só na página dedicada `/busca`) → Task 9 (a usuária esclareceu que o pedido original de "busca por nome" era sobre a Calculadora, não sobre `/busca`, que já funcionava).
 
-**Placeholder scan:** nenhum "TBD"/"TODO" nos steps. Item 4 do spec fica deliberadamente de fora com justificativa, não como placeholder vago.
+**Placeholder scan:** nenhum "TBD"/"TODO" nos steps.
 
 **Type consistency:** `PlataformaAPI` (Task 4) usa os mesmos nomes de campo retornados pela rota `GET /api/plataformas` (Task 3 adicionou `custoEmbalagem` a essa resposta). `salvarPrecificacao` usa exatamente os nomes de campo aceitos por `POST /api/precificacao` (Task 1/já existente). `codigoAnuncio` usado de forma consistente em schema, rotas e UI (Task 1).
