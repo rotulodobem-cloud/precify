@@ -41,10 +41,8 @@ export async function GET(req: NextRequest) {
               pesoGramas: true,
               custoTotal: true,
               custoCalculado: true,
-              anuncios: {
-                where: { ativo: true },
+              precificacoes: {
                 select: {
-                  canal: true,
                   precoAtual: true,
                   precoMinimo: true,
                   precoIdeal: true,
@@ -54,6 +52,7 @@ export async function GET(req: NextRequest) {
                   statusMargem: true,
                   comissaoPct: true,
                   impostoPct: true,
+                  plataforma: { select: { slug: true } },
                 }
               }
             }
@@ -61,7 +60,32 @@ export async function GET(req: NextRequest) {
         },
         orderBy: { nome: 'asc' }
       })
-      return NextResponse.json({ ok: true, data: produtos }, { headers: CORS_HEADERS })
+
+      // Mantém o formato de resposta externo: cada variação expõe `anuncios`
+      // (não `precificacoes`), com `canal` derivado de `plataforma.slug`.
+      const produtosResposta = produtos.map(produto => ({
+        ...produto,
+        variacoes: produto.variacoes.map(variacao => {
+          const { precificacoes, ...restoVariacao } = variacao
+          return {
+            ...restoVariacao,
+            anuncios: precificacoes.map(p => ({
+              canal: p.plataforma.slug,
+              precoAtual: p.precoAtual,
+              precoMinimo: p.precoMinimo,
+              precoIdeal: p.precoIdeal,
+              precoMaximo: p.precoMaximo,
+              precoPromocional: p.precoPromocional,
+              margemAtual: p.margemAtual,
+              statusMargem: p.statusMargem,
+              comissaoPct: p.comissaoPct,
+              impostoPct: p.impostoPct,
+            }))
+          }
+        })
+      }))
+
+      return NextResponse.json({ ok: true, data: produtosResposta }, { headers: CORS_HEADERS })
     }
 
     // ── 2. PRODUTO ESPECÍFICO POR SKU ─────────────────────────────────────
@@ -78,10 +102,6 @@ export async function GET(req: NextRequest) {
           variacoes: {
             where: { status: 'ativo' },
             include: {
-              anuncios: {
-                where: { ativo: true },
-                include: { variacao: false }
-              },
               precificacoes: {
                 include: { plataforma: true }
               }
