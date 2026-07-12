@@ -64,11 +64,15 @@ de implementá-la.
 - "Salvar" na Calculadora passa a gravar em `Precificacao` (plataformaId +
   skuVariacao), não mais em `Anuncio` (que está sendo removido no item 1).
 
-### 4. Layout da Calculadora — variações empilhadas
+### 4. Layout da Calculadora — sem rolagem lateral
 
-- Quando um produto tem mais de uma variação, os cartões de resultado hoje
-  ficam lado a lado (grid horizontal). Trocar para layout empilhado
-  (`flex-col` em vez de grid multi-coluna), uma variação embaixo da outra.
+- Confirmado por print: os cartões de variação já ficam empilhados
+  verticalmente. O problema real é a tabela de cada canal, que tem 8
+  colunas (Canal, Frete, Custo total, Mínimo, Ideal, Máximo, Promoção,
+  Salvar) e passa da largura da tela, exigindo rolagem lateral para ver
+  Máximo/Promoção/Salvar. Trocar a tabela por um cartão por canal, com os
+  4 preços (Mínimo, Ideal, Máximo, Promoção) num grid que quebra linha
+  em vez de colunas fixas — elimina a rolagem horizontal.
 
 ### 5. Plataformas: excluir Magalu + botão de excluir
 
