@@ -49,52 +49,7 @@ model Variacao {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  anuncios      Anuncio[]
   precificacoes Precificacao[]
-}
-
-// ─── ANÚNCIOS ────────────────────────────────────────────────
-// Cada variação pode ter múltiplos anúncios (FULL, Clássico, Shopee, etc.)
-model Anuncio {
-  id                String   @id @default(cuid())
-  skuVariacao       String
-  variacao          Variacao @relation(fields: [skuVariacao], references: [skuVariacao], onDelete: Cascade)
-
-  // Identificação
-  canal             String   // ml_full | ml_classico | ml_flex | shopee | tray | loja
-  codigoAnuncio     String?  // ex: MLB6620253832
-  codigoCatalogo    String?  // ex: MLB4562038243 (quando sincronizado)
-  skuCanal          String?  // SKU específico do canal (ex: VS000592)
-  nomeAnuncio       String?  // nome do anúncio no marketplace
-
-  // Status
-  ativo             Boolean  @default(true)
-
-  // Custos específicos deste anúncio
-  custoEmbalagem    Float    @default(0)   // 0 para FULL (embalagem deles)
-  custoColeta       Float    @default(0.60) // R$0,60/un para FULL
-  custoFrete        Float    @default(0)   // calculado pela tabela ou fixo
-  tipoFrete         String   @default("full") // full | flex | classico | fixo
-
-  // Comissão e imposto (podem variar por produto/canal)
-  comissaoPct       Float
-  impostoPct        Float    @default(0.0829)
-
-  // Preço praticado
-  precoAtual        Float?
-
-  // Calculados
-  custoTotalCalc    Float?
-  lucroBruto        Float?
-  margemAtual       Float?
-  precoMinimo       Float?
-  precoIdeal        Float?
-  precoMaximo       Float?
-  precoPromocional  Float?
-  statusMargem      String?
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
 }
 
 // ─── PLATAFORMAS ─────────────────────────────────────────────

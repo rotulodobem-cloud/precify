@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
-  Zap, Truck, Megaphone, Settings, Calculator
+  Zap, Truck, Settings, Calculator
 } from 'lucide-react'
 
 const links = [
@@ -12,7 +12,6 @@ const links = [
   { href: '/busca',          label: 'Busca por SKU',   icon: Search },
   { divider: true,           label: 'Precificação' },
   { href: '/calculadora',    label: 'Calculadora',     icon: Calculator },
-  { href: '/anuncios',       label: 'Anúncios',        icon: Megaphone },
   { href: '/precificacao',   label: 'Precificação',    icon: Tag },
   { href: '/frete',          label: 'Frete ML',        icon: Truck },
   { divider: true,           label: 'Cadastros' },
