@@ -6,9 +6,9 @@ import { Modal, Alert, Spinner } from '@/components/ui'
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 const brl = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`
 
-interface Plataforma { id: string; nome: string; slug: string; comissaoPct: number; taxaFixa: number; custoFrete: number; custoColeta: number; impostoPct: number; corHex: string; ativa: boolean; observacoes: string | null }
+interface Plataforma { id: string; nome: string; slug: string; comissaoPct: number; taxaFixa: number; custoFrete: number; custoColeta: number; custoEmbalagem: number; impostoPct: number; corHex: string; ativa: boolean; observacoes: string | null }
 
-const empty = { nome: '', slug: '', comissaoPct: '', taxaFixa: '', custoFrete: '', custoColeta: '', impostoPct: '0.08', corHex: '#6366f1', observacoes: '' }
+const empty = { nome: '', slug: '', comissaoPct: '', taxaFixa: '', custoFrete: '', custoColeta: '', custoEmbalagem: '', impostoPct: '0.08', corHex: '#6366f1', observacoes: '' }
 
 export default function PlataformasPage() {
   const [plats, setPlats] = useState<Plataforma[]>([])
@@ -21,7 +21,7 @@ export default function PlataformasPage() {
 
   const openAdd = () => { setForm(empty); setEditing(null); setError(''); setModal(true) }
   const openEdit = (p: Plataforma) => {
-    setForm({ nome: p.nome, slug: p.slug, comissaoPct: String(p.comissaoPct), taxaFixa: String(p.taxaFixa), custoFrete: String(p.custoFrete), custoColeta: String(p.custoColeta), impostoPct: String(p.impostoPct), corHex: p.corHex, observacoes: p.observacoes ?? '' })
+    setForm({ nome: p.nome, slug: p.slug, comissaoPct: String(p.comissaoPct), taxaFixa: String(p.taxaFixa), custoFrete: String(p.custoFrete), custoColeta: String(p.custoColeta), custoEmbalagem: String(p.custoEmbalagem), impostoPct: String(p.impostoPct), corHex: p.corHex, observacoes: p.observacoes ?? '' })
     setEditing(p.id); setError(''); setModal(true)
   }
   const save = async () => {
@@ -64,7 +64,7 @@ export default function PlataformasPage() {
                 <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={15} /></button>
               </div>
               <div className="space-y-1.5 text-sm">
-                {[['Comissão', pct(p.comissaoPct)], ['Taxa fixa', brl(p.taxaFixa)], ['Frete médio', brl(p.custoFrete)], ['Imposto s/ receita', pct(p.impostoPct)]].map(([k, v]) => (
+                {[['Comissão', pct(p.comissaoPct)], ['Taxa fixa', brl(p.taxaFixa)], ['Embalagem', brl(p.custoEmbalagem)], ['Frete médio', brl(p.custoFrete)], ['Imposto s/ receita', pct(p.impostoPct)]].map(([k, v]) => (
                   <div key={k} className="flex justify-between"><span className="text-gray-500">{k}</span><span className="font-medium text-gray-800">{v}</span></div>
                 ))}
               </div>
@@ -88,10 +88,13 @@ export default function PlataformasPage() {
             <div><label className="lbl">Comissão (0.14 = 14%) *</label><input className="inp" type="number" step="0.001" value={form.comissaoPct} onChange={f('comissaoPct')} placeholder="0.14" /></div>
             <div><label className="lbl">Imposto s/ receita</label><input className="inp" type="number" step="0.001" value={form.impostoPct} onChange={f('impostoPct')} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div><label className="lbl">Taxa fixa R$</label><input className="inp" type="number" step="0.01" value={form.taxaFixa} onChange={f('taxaFixa')} /></div>
             <div><label className="lbl">Frete médio R$</label><input className="inp" type="number" step="0.01" value={form.custoFrete} onChange={f('custoFrete')} /></div>
-            <div><label className="lbl">Cor hex</label><input className="inp" type="color" value={form.corHex} onChange={f('corHex')} className="inp h-9 p-0.5 cursor-pointer" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="lbl">Custo embalagem R$</label><input className="inp" type="number" step="0.01" value={form.custoEmbalagem} onChange={f('custoEmbalagem')} placeholder="0,60" /></div>
+            <div><label className="lbl">Cor hex</label><input className="inp h-9 p-0.5 cursor-pointer" type="color" value={form.corHex} onChange={f('corHex')} /></div>
           </div>
           {form.comissaoPct && (
             <div className="bg-indigo-50 rounded-xl p-3 text-xs">

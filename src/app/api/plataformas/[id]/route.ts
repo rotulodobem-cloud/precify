@@ -8,7 +8,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     data: {
       nome: b.nome, comissaoPct: parseFloat(b.comissaoPct),
       taxaFixa: parseFloat(b.taxaFixa ?? 0), custoFrete: parseFloat(b.custoFrete ?? 0),
-      custoColeta: parseFloat(b.custoColeta ?? 0), impostoPct: parseFloat(b.impostoPct ?? 0.08),
+      custoColeta: parseFloat(b.custoColeta ?? 0), custoEmbalagem: parseFloat(b.custoEmbalagem ?? 0),
+      impostoPct: parseFloat(b.impostoPct ?? 0.08),
       corHex: b.corHex || '#64748b', observacoes: b.observacoes || null, ativa: b.ativa ?? true,
     },
   })

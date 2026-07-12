@@ -106,6 +106,7 @@ model Plataforma {
   taxaFixa        Float    @default(0)
   custoFrete      Float    @default(0)
   custoColeta     Float    @default(0)
+  custoEmbalagem  Float    @default(0)
   impostoPct      Float    @default(0.0829)
   corHex          String   @default("#64748b")
   ativa           Boolean  @default(true)
