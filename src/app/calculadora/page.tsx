@@ -82,6 +82,7 @@ export default function CalculadoraPage() {
   const [q, setQ]               = useState('')
   const [produto, setProduto]   = useState<Produto | null>(null)
   const [loading, setLoading]   = useState(false)
+  const [sugestoes, setSugestoes] = useState<Produto[]>([])
   const [plataformas, setPlataformas] = useState<PlataformaAPI[]>([])
   const [canais, setCanais]     = useState<Canal[]>(CANAIS_ML)
   const [resultados, setResultados] = useState<ResultadoVariacao[]>([])
@@ -105,24 +106,35 @@ export default function CalculadoraPage() {
     })
   }, [])
 
-  // ── Buscar produto ou kit ─────────────────────────────────
-  const buscarProduto = useCallback(async (sku: string) => {
-    if (sku.length < 2) { setProduto(null); setResultados([]); setCalculado(false); return }
+  // ── Buscar produto (por SKU ou nome) ou kit ─────────────────
+  const buscarProduto = useCallback(async (q: string) => {
+    if (q.length < 2) { setProduto(null); setSugestoes([]); setResultados([]); setCalculado(false); return }
     setLoading(true)
 
-    // Tentar produto primeiro
-    const rProd = await fetch(`/api/produtos/${encodeURIComponent(sku)}`)
-    if (rProd.ok) {
-      const p = await rProd.json()
-      setProduto(p)
+    const rBusca = await fetch(`/api/busca?q=${encodeURIComponent(q)}`)
+    const { results } = rBusca.ok ? await rBusca.json() : { results: [] }
+
+    if (results.length === 1) {
+      setProduto(results[0])
+      setSugestoes([])
       setResultados([])
       setCalculado(false)
       setLoading(false)
       return
     }
 
-    // Se não encontrou produto, tentar kit
-    const rKit = await fetch(`/api/kits/${encodeURIComponent(sku)}`)
+    if (results.length > 1) {
+      setProduto(null)
+      setSugestoes(results)
+      setResultados([])
+      setCalculado(false)
+      setLoading(false)
+      return
+    }
+
+    // Nada encontrado por SKU/nome — tentar como kit (busca exata)
+    setSugestoes([])
+    const rKit = await fetch(`/api/kits/${encodeURIComponent(q)}`)
     if (rKit.ok) {
       const kit = await rKit.json()
       // Converter kit para formato de produto com 1 variação
@@ -149,6 +161,13 @@ export default function CalculadoraPage() {
     }
     setLoading(false)
   }, [])
+
+  const selecionarSugestao = (p: Produto) => {
+    setProduto(p)
+    setSugestoes([])
+    setResultados([])
+    setCalculado(false)
+  }
 
   const handleQ = (v: string) => {
     setQ(v); clearTimeout(timer.current)
@@ -286,7 +305,7 @@ export default function CalculadoraPage() {
             <div className="relative">
               <div className="absolute left-3 top-2.5 text-gray-400"><Search size={15} /></div>
               <input className="inp pl-9 pr-8" value={q} onChange={e => handleQ(e.target.value)}
-                placeholder="Ex: 242, VS000592…" autoFocus />
+                placeholder="Digite o SKU ou nome do produto…" autoFocus />
               {loading && <div className="absolute right-3 top-2.5"><Spinner size={14} /></div>}
             </div>
 
@@ -300,8 +319,19 @@ export default function CalculadoraPage() {
                 </div>
               </div>
             )}
-            {q.length >= 2 && !produto && !loading && (
-              <p className="text-xs text-red-500 mt-2">Produto não encontrado. Verifique o SKU.</p>
+            {sugestoes.length > 0 && (
+              <div className="mt-3 border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
+                {sugestoes.map(s => (
+                  <button key={s.skuPrincipal} onClick={() => selecionarSugestao(s)}
+                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 transition-colors">
+                    <div className="text-sm font-medium text-gray-800">{s.nome}</div>
+                    <div className="text-xs text-gray-400">{s.categoria} · SKU {s.skuPrincipal}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {q.length >= 2 && !produto && !loading && sugestoes.length === 0 && (
+              <p className="text-xs text-red-500 mt-2">Nenhum produto encontrado com esse SKU ou nome.</p>
             )}
           </div>
 
