@@ -21,10 +21,9 @@ const prisma = new PrismaClient();
 
 // Todas as tabelas do schema.prisma
 const MODELS = [
-  'produto', 'variacao', 'anuncio', 'plataforma', 'precificacao', 'compra',
-  'fornecedor', 'configuracao', 'kit', 'kitComponente', 'canal',
-  'comissaoCategoria', 'faixaEmbalagem', 'faixaFrete', 'configuracaoPrecificacao',
-  'listaAcaoPrecificacao', 'faturamento', 'fornecedorAlias', 'pedidoCompra', 'pedidoItem',
+  'produto', 'variacao', 'plataforma', 'precificacao', 'compra',
+  'fornecedor', 'configuracao', 'kit', 'kitComponente',
+  'faturamento', 'fornecedorAlias', 'pedidoCompra', 'pedidoItem',
 ];
 
 const MAX_BACKUPS = 60; // mantém ~2 meses de backups diários
