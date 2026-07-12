@@ -123,9 +123,16 @@ model Lote {
   - Lista de todos os lotes lançados (mais recentes primeiro), mostrando
     produto, fornecedor, número do lote, validade, quantidade.
   - Campo de busca por número de lote (`GET /api/lotes?q=...`, contains).
+  - Alerta de vencimento: linha fica **amarela** se a validade está a 30
+    dias ou menos de vencer, **vermelha** se já venceu. Sem configuração
+    de dias pela usuária nessa primeira versão — 30 dias fixo no código.
 - Nova rota `src/app/api/lotes/route.ts` (GET com busca, POST para criar)
   e `src/app/api/lotes/[id]/route.ts` (GET individual, DELETE se
   necessário corrigir um lançamento errado).
+- Dashboard (`src/app/page.tsx`): novo card/contador "X lotes vencendo"
+  (dentro da janela de 30 dias, incluindo já vencidos), visível na tela
+  inicial sem precisar entrar na aba Lotes. Clicar leva para a aba Lotes
+  já filtrada nesses itens.
 
 ### 7. Etiqueta térmica
 
@@ -147,9 +154,8 @@ model Lote {
   marca/modelo de impressora.
 - Reaproveitar `PedidoCompra`/`PedidoItem` — mantido como está, sem
   relação com este spec.
-- Alertas de lote vencido/vencendo — não foi pedido; a aba Lotes desse
-  spec é só cadastro, busca e etiqueta. Fica para um pedido futuro caso
-  a usuária sinta falta.
+- Configuração do prazo de alerta (30 dias) pela usuária — fixo no código
+  nessa primeira versão, sem tela de configuração.
 
 ## Riscos e observações
 
