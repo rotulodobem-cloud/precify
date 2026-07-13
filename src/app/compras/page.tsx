@@ -185,7 +185,15 @@ export default function ComprasPage() {
     }, 400)
   }
 
-  const addItemRow = () => setItensCompra(prev => [...prev, { ...emptyItem }])
+  const addItemRow = () => {
+    setItensCompra(prev => [{ ...emptyItem }, ...prev])
+    setSkuLookups(prev => {
+      const n: Record<number, { nome?: string; fornecedor?: string; custo?: number } | null> = {}
+      for (const [key, value] of Object.entries(prev)) n[Number(key) + 1] = value
+      return n
+    })
+    setSkuLoadingIdx(prev => (prev === null ? null : prev + 1))
+  }
   const removeItemRow = (idx: number) => {
     setItensCompra(prev => prev.filter((_, i) => i !== idx))
     setSkuLookups(prev => {
