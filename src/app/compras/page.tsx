@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet, Pencil } from 'lucide-react'
+import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet, Pencil, Tag } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
 
@@ -107,6 +107,10 @@ export default function ComprasPage() {
   const [editModal, setEditModal] = useState<Compra | null>(null)
   const [editForm, setEditForm]   = useState(emptyFormCompra)
   const [editItem, setEditItem]   = useState({ quantidade: '', custoTotal: '', frete: '', outrosCustos: '' })
+  const [loteModal, setLoteModal] = useState<Compra | null>(null)
+  const [loteForm, setLoteForm]   = useState({ numeroLote: '', quantidade: '', dataValidade: '' })
+  const [loteError, setLoteError] = useState('')
+  const [loteSaving, setLoteSaving] = useState(false)
 
   // SKU lookup
   const [skuLookups, setSkuLookups] = useState<Record<number, { nome?: string; fornecedor?: string; custo?: number } | null>>({})
@@ -252,6 +256,25 @@ export default function ComprasPage() {
     })
     if (!r.ok) { const d = await r.json(); setError(d.error ?? 'Erro ao salvar'); setSaving(false); return }
     setEditModal(null); load(); setSaving(false)
+  }
+
+  // ── Lançar lote ─────────────────────────────────────────────
+  const openLote = (c: Compra) => {
+    setLoteModal(c)
+    setLoteForm({ numeroLote: '', quantidade: String(c.quantidade), dataValidade: '' })
+    setLoteError('')
+  }
+
+  const saveLote = async () => {
+    if (!loteModal) return
+    if (!loteForm.dataValidade) { setLoteError('Data de validade é obrigatória'); return }
+    setLoteSaving(true); setLoteError('')
+    const r = await fetch('/api/lotes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ compraId: loteModal.id, numeroLote: loteForm.numeroLote, quantidade: loteForm.quantidade, dataValidade: loteForm.dataValidade }),
+    })
+    if (!r.ok) { const d = await r.json(); setLoteError(d.error ?? 'Erro ao salvar lote'); setLoteSaving(false); return }
+    setLoteModal(null); setLoteSaving(false)
   }
 
   // ── Salvar fornecedor ─────────────────────────────────────
@@ -606,9 +629,12 @@ export default function ComprasPage() {
                       {pct(c.margem)}
                     </td>
                     <td className="td text-center"><StatusBadge status={c.statusFinanceiro} /></td>
-                    <td className="td">
+                    <td className="td flex items-center gap-2">
                       <button onClick={() => openEditCompra(c)} className="text-gray-300 hover:text-indigo-600 transition-colors">
                         <Pencil size={13} />
+                      </button>
+                      <button onClick={() => openLote(c)} className="text-gray-300 hover:text-emerald-600 transition-colors" title="Lançar lote">
+                        <Tag size={13} />
                       </button>
                     </td>
                   </tr>
@@ -1483,6 +1509,45 @@ export default function ComprasPage() {
               <button className="btn-ghost" onClick={() => setEditModal(null)}>Cancelar</button>
               <button className="btn-primary" onClick={saveEditCompra} disabled={saving}>
                 {saving ? <Spinner size={13} /> : null} Salvar
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── MODAL LANÇAR LOTE ── */}
+      <Modal title="Lançar lote" open={!!loteModal} onClose={() => setLoteModal(null)}>
+        {loteModal && (
+          <div className="space-y-3">
+            {loteError && <Alert type="error">{loteError}</Alert>}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-500 space-y-0.5">
+              <div><strong className="text-gray-700">{loteModal.nomeProduto}</strong> — SKU {loteModal.skuPrincipal}</div>
+              <div>Fornecedor: {loteModal.fornecedor || '—'}</div>
+              <div>Data da compra: {dt(loteModal.dataCompra)}</div>
+              <div>NF/Pedido: {loteModal.numeroNF || loteModal.numeroPedido || '—'}</div>
+            </div>
+            <div>
+              <label className="lbl">Número do lote (deixe em branco para gerar automaticamente)</label>
+              <input className="inp" value={loteForm.numeroLote}
+                onChange={e => setLoteForm(p => ({ ...p, numeroLote: e.target.value }))}
+                placeholder="Se vazio, gera AAAAMMDD-SKU" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="lbl">Quantidade coberta por esse lote</label>
+                <input className="inp" type="number" step="0.01" value={loteForm.quantidade}
+                  onChange={e => setLoteForm(p => ({ ...p, quantidade: e.target.value }))} />
+              </div>
+              <div>
+                <label className="lbl">Data de validade *</label>
+                <input className="inp" type="date" value={loteForm.dataValidade}
+                  onChange={e => setLoteForm(p => ({ ...p, dataValidade: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button className="btn-ghost" onClick={() => setLoteModal(null)}>Cancelar</button>
+              <button className="btn-primary" onClick={saveLote} disabled={loteSaving}>
+                {loteSaving ? <Spinner size={13} /> : null} Salvar lote
               </button>
             </div>
           </div>
