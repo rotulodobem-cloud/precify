@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet } from 'lucide-react'
+import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet, Pencil } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
 
@@ -22,7 +22,8 @@ type Aba = 'dashboard' | 'historico' | 'fornecedores' | 'ranking' | 'mensal' | '
 
 interface Compra {
   id: string; dataCompra: string; skuPrincipal: string; nomeProduto: string; fornecedor: string
-  quantidade: number; custoTotal: number; custoUnitario: number; custoAnterior: number | null
+  quantidade: number; custoTotal: number; frete: number; outrosCustos: number
+  custoUnitario: number; custoAnterior: number | null
   variacaoPct: number | null; statusVariacao: string | null; precoVenda: number | null
   margem: number | null; statusFinanceiro: string | null; fonte: string
   numeroNF: string | null; numeroPedido: string | null
@@ -103,6 +104,9 @@ export default function ComprasPage() {
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
   const [errorForn, setErrorForn] = useState('')
+  const [editModal, setEditModal] = useState<Compra | null>(null)
+  const [editForm, setEditForm]   = useState(emptyFormCompra)
+  const [editItem, setEditItem]   = useState({ quantidade: '', custoTotal: '', frete: '', outrosCustos: '' })
 
   // SKU lookup
   const [skuLookups, setSkuLookups] = useState<Record<number, { nome?: string; fornecedor?: string; custo?: number } | null>>({})
@@ -222,6 +226,32 @@ export default function ComprasPage() {
     setItensCompra([{ ...emptyItem }])
     setSkuLookups({})
     load(); setSaving(false)
+  }
+
+  // ── Editar compra ──────────────────────────────────────────
+  const openEditCompra = (c: Compra) => {
+    setEditModal(c)
+    setEditForm({
+      dataCompra: c.dataCompra.slice(0, 10), fornecedor: c.fornecedor,
+      numeroNF: c.numeroNF ?? '', numeroPedido: c.numeroPedido ?? '', frete: String(c.frete ?? 0),
+    })
+    setEditItem({ quantidade: String(c.quantidade), custoTotal: String(c.custoTotal), frete: '', outrosCustos: '' })
+    setError('')
+  }
+
+  const saveEditCompra = async () => {
+    if (!editModal) return
+    setSaving(true); setError('')
+    const r = await fetch(`/api/compras/${editModal.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dataCompra: editForm.dataCompra, fornecedor: editForm.fornecedor,
+        numeroNF: editForm.numeroNF, numeroPedido: editForm.numeroPedido,
+        quantidade: editItem.quantidade, custoTotal: editItem.custoTotal,
+      }),
+    })
+    if (!r.ok) { const d = await r.json(); setError(d.error ?? 'Erro ao salvar'); setSaving(false); return }
+    setEditModal(null); load(); setSaving(false)
   }
 
   // ── Salvar fornecedor ─────────────────────────────────────
@@ -547,7 +577,7 @@ export default function ComprasPage() {
                 <th className="th">Data</th><th className="th">SKU / Produto</th><th className="th">Fornecedor</th>
                 <th className="th-r">Qtd</th><th className="th-r">Custo unit.</th><th className="th-r">Anterior</th>
                 <th className="th text-center">Variação</th><th className="th-r">P. Venda</th>
-                <th className="th-r">Margem</th><th className="th text-center">Status</th>
+                <th className="th-r">Margem</th><th className="th text-center">Status</th><th className="th w-8"></th>
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {loading && <Loading />}
@@ -576,6 +606,11 @@ export default function ComprasPage() {
                       {pct(c.margem)}
                     </td>
                     <td className="td text-center"><StatusBadge status={c.statusFinanceiro} /></td>
+                    <td className="td">
+                      <button onClick={() => openEditCompra(c)} className="text-gray-300 hover:text-indigo-600 transition-colors">
+                        <Pencil size={13} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1393,6 +1428,58 @@ export default function ComprasPage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* ── MODAL EDITAR COMPRA ── */}
+      <Modal title="Editar compra" open={!!editModal} onClose={() => setEditModal(null)}>
+        {editModal && (
+          <div className="space-y-3">
+            {error && <Alert type="error">{error}</Alert>}
+            <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-500">
+              {editModal.skuPrincipal} — {editModal.nomeProduto}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="lbl">Data *</label>
+                <input className="inp" type="date" value={editForm.dataCompra}
+                  onChange={e => setEditForm(p => ({ ...p, dataCompra: e.target.value }))} />
+              </div>
+              <div>
+                <label className="lbl">Fornecedor</label>
+                <input className="inp" list="forn-list" value={editForm.fornecedor}
+                  onChange={e => setEditForm(p => ({ ...p, fornecedor: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Nº NF ou Pedido</label>
+              <input className="inp" value={editForm.numeroNF}
+                onChange={e => setEditForm(p => ({ ...p, numeroNF: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="lbl">Quantidade *</label>
+                <input className="inp" type="number" step="0.01" value={editItem.quantidade}
+                  onChange={e => setEditItem(p => ({ ...p, quantidade: e.target.value }))} />
+              </div>
+              <div>
+                <label className="lbl">Custo total R$ *</label>
+                <input className="inp" type="number" step="0.01" value={editItem.custoTotal}
+                  onChange={e => setEditItem(p => ({ ...p, custoTotal: e.target.value }))} />
+              </div>
+            </div>
+            {editItem.quantidade && editItem.custoTotal && parseFloat(editItem.quantidade) > 0 && (
+              <p className="text-xs text-indigo-600">
+                Novo custo unitário: <strong>{num(parseFloat(editItem.custoTotal) / parseFloat(editItem.quantidade))}</strong>
+              </p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button className="btn-ghost" onClick={() => setEditModal(null)}>Cancelar</button>
+              <button className="btn-primary" onClick={saveEditCompra} disabled={saving}>
+                {saving ? <Spinner size={13} /> : null} Salvar
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* ── MODAL NOVO FORNECEDOR ── */}
