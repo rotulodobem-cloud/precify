@@ -1450,10 +1450,17 @@ export default function ComprasPage() {
                   onChange={e => setEditForm(p => ({ ...p, fornecedor: e.target.value }))} />
               </div>
             </div>
-            <div>
-              <label className="lbl">Nº NF ou Pedido</label>
-              <input className="inp" value={editForm.numeroNF}
-                onChange={e => setEditForm(p => ({ ...p, numeroNF: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="lbl">Nº NF</label>
+                <input className="inp" value={editForm.numeroNF}
+                  onChange={e => setEditForm(p => ({ ...p, numeroNF: e.target.value }))} placeholder="Ex: 12345" />
+              </div>
+              <div>
+                <label className="lbl">Nº Pedido</label>
+                <input className="inp" value={editForm.numeroPedido}
+                  onChange={e => setEditForm(p => ({ ...p, numeroPedido: e.target.value }))} placeholder="Ex: 12345" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
