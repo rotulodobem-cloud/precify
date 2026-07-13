@@ -180,7 +180,21 @@ export default function ComprasPage() {
   const addItemRow = () => setItensCompra(prev => [...prev, { ...emptyItem }])
   const removeItemRow = (idx: number) => {
     setItensCompra(prev => prev.filter((_, i) => i !== idx))
-    setSkuLookups(prev => { const n = { ...prev }; delete n[idx]; return n })
+    setSkuLookups(prev => {
+      const n: Record<number, { nome?: string; fornecedor?: string; custo?: number } | null> = {}
+      for (const [key, value] of Object.entries(prev)) {
+        const k = Number(key)
+        if (k < idx) n[k] = value
+        else if (k > idx) n[k - 1] = value
+        // k === idx is dropped (the removed row)
+      }
+      return n
+    })
+    setSkuLoadingIdx(prev => {
+      if (prev === null) return null
+      if (prev === idx) return null
+      return prev > idx ? prev - 1 : prev
+    })
   }
 
   const somaCustoItens = itensCompra.reduce((s, it) => s + (parseFloat(it.custoTotal) || 0), 0)
@@ -1280,7 +1294,7 @@ export default function ComprasPage() {
         <div className="space-y-3">
           {error && <Alert type="error">{error}</Alert>}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <div>
               <label className="lbl">Data *</label>
               <input className="inp" type="date" value={formCompra.dataCompra} onChange={f('dataCompra')} />
@@ -1294,8 +1308,12 @@ export default function ComprasPage() {
               </datalist>
             </div>
             <div>
-              <label className="lbl">Nº NF ou Pedido</label>
+              <label className="lbl">Nº NF</label>
               <input className="inp" value={formCompra.numeroNF} onChange={f('numeroNF')} placeholder="Ex: 12345" />
+            </div>
+            <div>
+              <label className="lbl">Nº Pedido</label>
+              <input className="inp" value={formCompra.numeroPedido} onChange={f('numeroPedido')} placeholder="Ex: 12345" />
             </div>
           </div>
 
