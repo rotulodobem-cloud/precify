@@ -125,6 +125,24 @@ model Compra {
   numeroNF         String?
   numeroPedido     String?
   createdAt        DateTime @default(now())
+
+  lotes            Lote[]
+}
+
+// ─── LOTES (rastreabilidade / vigilância sanitária) ───────────
+model Lote {
+  id            String    @id @default(cuid())
+  compraId      String
+  compra        Compra    @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  numeroLote    String
+  geradoAuto    Boolean   @default(false)
+  quantidade    Float
+  dataValidade  DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([numeroLote])
+  @@index([compraId])
 }
 
 // ─── FORNECEDORES ────────────────────────────────────────────
