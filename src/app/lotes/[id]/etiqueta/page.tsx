@@ -5,7 +5,7 @@ const dt = (d: string) => new Date(d).toLocaleDateString('pt-BR')
 
 interface LoteDetalhe {
   numeroLote: string; dataValidade: string
-  compra: { skuPrincipal: string; nomeProduto: string; fornecedor: string; dataCompra: string }
+  compra: { skuPrincipal: string; nomeProduto: string; fornecedor: string; dataCompra: string; numeroNF: string | null; numeroPedido: string | null }
 }
 
 // Tamanho da etiqueta — trocar aqui se precisar de outro tamanho no futuro
@@ -57,7 +57,10 @@ export default function EtiquetaLotePage({ params }: { params: { id: string } })
         <div className="produto">{lote.compra.nomeProduto}</div>
         <div className="linha">SKU: {lote.compra.skuPrincipal}</div>
         <div className="linha">Fornecedor: {lote.compra.fornecedor || '—'}</div>
-        <div className="linha">Compra: {dt(lote.compra.dataCompra)}</div>
+        <div className="linha">
+          Compra: {dt(lote.compra.dataCompra)}
+          {(lote.compra.numeroNF || lote.compra.numeroPedido) && ` · NF ${lote.compra.numeroNF || lote.compra.numeroPedido}`}
+        </div>
         <div className="linha">Validade: {dt(lote.dataValidade)}</div>
         <div className="lote">Lote: {lote.numeroLote}</div>
       </div>
