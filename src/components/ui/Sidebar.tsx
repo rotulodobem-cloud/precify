@@ -21,6 +21,7 @@ const links = [
   { href: '/plataformas',    label: 'Plataformas',     icon: Store },
   { divider: true,           label: 'Operacional' },
   { href: '/compras',        label: 'Compras',         icon: ShoppingCart },
+  { href: '/lotes',          label: 'Lotes',           icon: Tag },
   { href: '/importar',       label: 'Importar XLSX',   icon: Upload },
   { href: '/configuracoes',  label: 'Configurações',   icon: Settings },
 ]
