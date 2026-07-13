@@ -19,11 +19,17 @@ interface DashData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [lotesVencendo, setLotesVencendo] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const r = await fetch('/api/dashboard')
+    const [r, rLotes] = await Promise.all([
+      fetch('/api/dashboard'),
+      fetch('/api/lotes?vencendo=1'),
+    ])
     setData(await r.json())
+    const lotes = await rLotes.json()
+    setLotesVencendo(Array.isArray(lotes) ? lotes.length : 0)
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -42,6 +48,12 @@ export default function DashboardPage() {
           {loading ? <Spinner size={14} /> : <RefreshCw size={14} />} Atualizar
         </button>
       </div>
+
+      {!!lotesVencendo && (
+        <Link href="/lotes" className="block bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 hover:bg-amber-100 transition-colors">
+          <strong>{lotesVencendo}</strong> {lotesVencendo === 1 ? 'lote está vencido ou vence' : 'lotes estão vencidos ou vencem'} nos próximos 30 dias — clique para ver.
+        </Link>
+      )}
 
       {/* Métricas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
