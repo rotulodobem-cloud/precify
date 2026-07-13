@@ -40,6 +40,18 @@ export default function EtiquetaLotePage({ params }: { params: { id: string } })
         .etiqueta .linha { font-size: 10pt; }
         .etiqueta .lote { font-size: 12pt; font-weight: bold; margin-top: 0.15cm; }
         @media screen { body { background: #eee; } .etiqueta { background: white; margin: 1cm auto; box-shadow: 0 0 8px rgba(0,0,0,0.15); } }
+
+        /* Esta página nasce dentro do layout padrão do app (menu lateral
+           incluso), então ao imprimir precisamos esconder tudo que não
+           for a etiqueta em si — senão o menu e o restante da tela
+           também vão para o papel. */
+        @media print {
+          aside { display: none !important; }
+          main { padding: 0 !important; }
+          .etiqueta {
+            position: fixed; top: 0; left: 0; margin: 0; box-shadow: none;
+          }
+        }
       `}</style>
       <div className="etiqueta">
         <div className="produto">{lote.compra.nomeProduto}</div>
