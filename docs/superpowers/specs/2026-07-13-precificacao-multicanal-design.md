@@ -45,9 +45,7 @@ Própria** — canal que hoje não existe em nenhuma tela do Precify.
 - **ML Clássico** — usa o modelo simples de campos editáveis (embalagem,
   comissão, outras taxas, taxa fixa, frete em R$ digitado direto) igual
   aos demais canais desta ferramenta, **não** a tabela de frete por peso
-  que a Calculadora usa pra Clássico. Decisão técnica minha — se a
-  usuária preferir a tabela por peso aqui também, ajusto depois da
-  revisão deste documento.
+  — confirmado com a usuária que essa tabela só se aplica ao FULL.
 - **Shopee** — mantém o ajuste automático de faixa (a comissão e taxa
   fixa mudam sozinhas conforme o preço calculado cai numa faixa: até
   R$79,99 → 20%/R$4; R$80–99,99 → 14%/R$16; R$100–199,99 → 14%/R$20;
@@ -154,8 +152,5 @@ com um ícone de folha (🍃, lucide `Leaf`) no menu combinando com a marca.
   preencher variação (ou usar consistentemente o SKU da variação
   específica, não o SKU principal) isso não deve acontecer. Se virar
   problema real, ajustamos depois.
-- ML Clássico usando o modelo simples (campo de frete editável) em vez
-  da tabela por peso da Calculadora é uma decisão técnica meio aberta —
-  sinalizada acima pra confirmar na revisão deste documento.
 - Alterações de schema (`prisma db push`) serão aplicadas com backup
   manual antes, mesmo padrão já usado nas duas rodadas anteriores.
