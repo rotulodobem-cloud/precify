@@ -99,7 +99,7 @@ model CalculoMulticanal {
   skuVariacao          String?  // liga à Variacao real, se existir no cadastro
   sku                  String
   nome                 String
-  variacao             String?
+  variacao             String   @default("")
   custoProduto         Float
   despesasVariaveisPct Float    @default(8)
   despesasFixasPct     Float    @default(0)
@@ -145,12 +145,10 @@ com um ícone de folha (🍃, lucide `Leaf`) no menu combinando com a marca.
 
 ## Riscos e observações
 
-- `@@unique([sku, variacao])` com `variacao` opcional: no Postgres,
-  valores `NULL` não colidem entre si em constraints únicas — ou seja,
-  se a usuária salvar duas vezes o mesmo SKU sem preencher variação, vai
-  criar duas linhas em vez de atualizar uma. Na prática, se ela sempre
-  preencher variação (ou usar consistentemente o SKU da variação
-  específica, não o SKU principal) isso não deve acontecer. Se virar
-  problema real, ajustamos depois.
+- `@@unique([sku, variacao])` usa `variacao String @default("")`
+  (não opcional) exatamente para evitar a armadilha do Postgres onde
+  valores `NULL` não colidem entre si em constraints únicas — assim,
+  salvar duas vezes o mesmo SKU sem variação sempre atualiza a mesma
+  linha, em vez de criar duplicatas.
 - Alterações de schema (`prisma db push`) serão aplicadas com backup
   manual antes, mesmo padrão já usado nas duas rodadas anteriores.
