@@ -42,6 +42,21 @@ export default function PrecificacaoMulticanalPage() {
   const [canais, setCanais] = useState<CanaisState>(canaisIniciais())
   const [shAuto, setShAuto] = useState(true)
 
+  // Biblioteca
+  const [biblioteca, setBiblioteca] = useState<any[]>([])
+  const [libFiltro, setLibFiltro] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [msgSalvo, setMsgSalvo] = useState('')
+
+  const carregarBiblioteca = useCallback(async (filtro: string) => {
+    const params = new URLSearchParams()
+    if (filtro) params.set('q', filtro)
+    const r = await fetch('/api/calculo-multicanal?' + params)
+    setBiblioteca(r.ok ? await r.json() : [])
+  }, [])
+
+  useEffect(() => { carregarBiblioteca(libFiltro) }, [libFiltro, carregarBiblioteca])
+
   const buscarProduto = useCallback((valor: string) => {
     setQ(valor)
     clearTimeout(buscaTimer.current)
@@ -89,6 +104,52 @@ export default function PrecificacaoMulticanalPage() {
       CANAIS_MULTICANAL.forEach(c => { n[c.key] = { ...n[c.key], margem: margemPadrao } })
       return n
     })
+  }
+
+  const salvarCalculo = async () => {
+    if (!sku.trim() && !nome.trim()) { setMsgSalvo('Informe o SKU ou o nome do produto.'); return }
+    setSalvando(true)
+    const r = await fetch('/api/calculo-multicanal', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sku, nome, variacao: variacaoTxt, skuVariacao: skuVariacaoLigado,
+        custoProduto, pesoGramas, despesasVariaveisPct: despVarPct, despesasFixasPct: despFixPct,
+        modo, precoTeste, canais,
+      }),
+    })
+    setSalvando(false)
+    if (!r.ok) { const d = await r.json(); setMsgSalvo(d.error ?? 'Erro ao salvar'); return }
+    setMsgSalvo('Cálculo salvo na biblioteca.')
+    carregarBiblioteca(libFiltro)
+    setTimeout(() => setMsgSalvo(''), 3000)
+  }
+
+  const carregarDaLib = (item: any) => {
+    setSku(item.sku); setNome(item.nome); setVariacaoTxt(item.variacao || '')
+    setSkuVariacaoLigado(item.skuVariacao); setCustoProduto(item.custoProduto); setPesoGramas(item.pesoGramas)
+    setDespVarPct(item.despesasVariaveisPct); setDespFixPct(item.despesasFixasPct)
+    setModo(item.modo === 'margem' ? 'margem' : 'preco'); setPrecoTeste(item.precoTeste || 0)
+    if (item.canais) setCanais(item.canais)
+    setProdutoSel(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const excluirDaLib = async (item: any) => {
+    if (!confirm(`Excluir ${item.sku || item.nome}${item.variacao ? ' (' + item.variacao + ')' : ''}?`)) return
+    await fetch(`/api/calculo-multicanal/${item.id}`, { method: 'DELETE' })
+    carregarBiblioteca(libFiltro)
+  }
+
+  const calcularPrecosLib = (item: any): Record<string, number | null> => {
+    const out: Record<string, number | null> = {}
+    CANAIS_MULTICANAL.forEach(def => {
+      const r = calcularCanalModoPreco({
+        custoProduto: item.custoProduto, despVarPct: item.despesasVariaveisPct, despFixPct: item.despesasFixasPct,
+        pesoGramas: item.pesoGramas, canal: item.canais?.[def.key] ?? def.default, def, shAuto: true,
+      })
+      out[def.key] = r ? r.preco : null
+    })
+    return out
   }
 
   const resultados: Record<string, ResultadoCanal | null> = {}
@@ -143,6 +204,15 @@ export default function PrecificacaoMulticanalPage() {
         .rdb-autobox { grid-column: 1/-1; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; background: #F7FAF3; border: 1px solid #DDE7D4; border-radius: 9px; padding: 7px 9px; cursor: pointer; }
         .rdb-selo { margin-left: auto; font-size: 9.5px; font-weight: 700; padding: 3px 7px; border-radius: 20px; background: #055E2B; color: #CDDE35; }
         .rdb-selo.err { background: #FBE6E3; color: #C0392B; }
+        .rdb-lib-ctrls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .rdb-lib-ctrls input { padding: 8px 12px; font-size: 13px; border: 1.5px solid #DDE7D4; border-radius: 10px; min-width: 200px; }
+        .rdb-btn { font-family: 'Poppins'; font-weight: 600; font-size: 12.5px; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1.5px solid #DDE7D4; background: #fff; }
+        .rdb-btn.prim { background: #055E2B; border-color: #055E2B; color: #fff; }
+        .rdb-libtbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .rdb-libtbl th { text-align: left; font-size: 10px; text-transform: uppercase; color: #5C6B60; padding: 8px 10px; background: #F7FAF3; border-bottom: 1px solid #DDE7D4; }
+        .rdb-libtbl th.r, .rdb-libtbl td.r { text-align: right; }
+        .rdb-libtbl td { padding: 8px 10px; border-bottom: 1px solid #EEF2E9; }
+        .rdb-iact { border: 1.5px solid #DDE7D4; background: #fff; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; }
       `}</style>
       <div className="rdb">
         <div className="rdb-header">
@@ -282,6 +352,56 @@ export default function PrecificacaoMulticanalPage() {
               )
             })}
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0' }}>
+            <button className="rdb-btn prim" onClick={salvarCalculo} disabled={salvando}>
+              {salvando ? 'Salvando…' : 'Salvar cálculo'}
+            </button>
+            {msgSalvo && <span style={{ fontSize: 12.5, color: '#5C6B60' }}>{msgSalvo}</span>}
+          </div>
+
+          <section className="rdb-card">
+            <h2>Biblioteca de produtos</h2>
+            <div className="rdb-lib-ctrls">
+              <input placeholder="Filtrar por SKU ou nome" value={libFiltro} onChange={e => setLibFiltro(e.target.value)} />
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="rdb-libtbl">
+                <thead>
+                  <tr>
+                    <th>SKU</th><th>Produto</th><th>Variação</th><th className="r">Custo</th>
+                    {CANAIS_MULTICANAL.map(c => <th key={c.key} className="r">{c.nome}{c.tag === 'FULL' ? ' Full' : c.tag === 'clássico' ? ' Clássico' : ''}</th>)}
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {biblioteca.length === 0 && (
+                    <tr><td colSpan={4 + CANAIS_MULTICANAL.length + 1} style={{ textAlign: 'center', padding: 20, color: '#5C6B60' }}>
+                      Nenhum cálculo salvo ainda.
+                    </td></tr>
+                  )}
+                  {biblioteca.map(item => {
+                    const precos = calcularPrecosLib(item)
+                    return (
+                      <tr key={item.id}>
+                        <td>{item.sku || '—'}</td>
+                        <td>{item.nome || '—'}</td>
+                        <td>{item.variacao || '—'}</td>
+                        <td className="r">{brl(item.custoProduto)}</td>
+                        {CANAIS_MULTICANAL.map(c => (
+                          <td key={c.key} className="r">{precos[c.key] != null ? brl(precos[c.key]!) : '—'}</td>
+                        ))}
+                        <td>
+                          <button className="rdb-iact" onClick={() => carregarDaLib(item)}>Carregar</button>
+                          <button className="rdb-iact" onClick={() => excluirDaLib(item)}>Excluir</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </div>
     </>
