@@ -24,6 +24,7 @@ const MODELS = [
   'produto', 'variacao', 'plataforma', 'precificacao', 'compra', 'lote',
   'fornecedor', 'configuracao', 'kit', 'kitComponente',
   'faturamento', 'fornecedorAlias', 'pedidoCompra', 'pedidoItem',
+  'calculoMulticanal',
 ];
 
 const MAX_BACKUPS = 60; // mantém ~2 meses de backups diários
