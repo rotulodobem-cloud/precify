@@ -253,3 +253,27 @@ model PedidoItem {
   obs              String?
   createdAt        DateTime @default(now())
 }
+
+// ─── PRECIFICAÇÃO MULTICANAL (Rótulo do Bem) ──────────────────
+// Independente de Precificacao/Plataforma: guarda os 5 canais
+// (Loja Própria, ML Full, ML Clássico, Shopee, TikTok Shop) lado
+// a lado por SKU+Variação, o que o model Precificacao não permite
+// (lá só cabe 1 linha por SKU×Plataforma).
+model CalculoMulticanal {
+  id                   String   @id @default(cuid())
+  skuVariacao          String?
+  sku                  String
+  nome                 String
+  variacao             String   @default("")
+  custoProduto         Float
+  pesoGramas           Float?
+  despesasVariaveisPct Float    @default(8)
+  despesasFixasPct     Float    @default(0)
+  modo                 String   @default("preco")
+  precoTeste           Float?
+  canais               Json
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([sku, variacao])
+}
