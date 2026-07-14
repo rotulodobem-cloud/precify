@@ -123,6 +123,26 @@ export default function PrecificacaoMulticanalPage() {
         .rdb-sugestoes { border: 1px solid #DDE7D4; border-radius: 10px; margin-top: 4px; overflow: hidden; }
         .rdb-sugestoes button { display: block; width: 100%; text-align: left; padding: 8px 12px; background: #fff; border: none; border-bottom: 1px solid #EEF2E9; cursor: pointer; font-size: 13px; }
         .rdb-sugestoes button:hover { background: #F7FAF3; }
+        .rdb-chans { display: grid; grid-template-columns: repeat(auto-fit,minmax(270px,1fr)); gap: 16px; margin-top: 4px; }
+        .rdb-chan { background: #fff; border: 1px solid #DDE7D4; border-radius: 16px; box-shadow: 0 8px 24px rgba(4,43,20,.06); overflow: hidden; }
+        .rdb-chan-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 0; }
+        .rdb-chan-ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Poppins'; font-weight: 700; font-size: 11px; }
+        .rdb-chan-nome { font-family: 'Poppins'; font-weight: 600; font-size: 13px; line-height: 1.15; }
+        .rdb-chan-nome span { display: block; font-family: 'Montserrat'; font-weight: 600; font-size: 10px; color: #5C6B60; }
+        .rdb-price { margin: 10px 14px; background: #055E2B; color: #fff; border-radius: 12px; padding: 13px 15px; }
+        .rdb-price.neg { background: #C0392B; }
+        .rdb-price .lb { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #CDDE35; font-weight: 700; }
+        .rdb-price.neg .lb { color: #fff; opacity: .85; }
+        .rdb-price .big { font-family: 'Poppins'; font-weight: 700; font-size: 28px; margin-top: 2px; }
+        .rdb-price .sub { font-size: 11.5px; color: #DCEAD9; margin-top: 2px; }
+        .rdb-price.neg .sub { color: #fff; }
+        .rdb-fees { padding: 10px 14px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px solid #DDE7D4; margin-top: 4px; }
+        .rdb-fees .rdb-field { margin: 0; }
+        .rdb-fees .rdb-field label { font-size: 10.5px; }
+        .rdb-fees input { font-size: 12.5px; padding: 7px 9px; }
+        .rdb-autobox { grid-column: 1/-1; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; background: #F7FAF3; border: 1px solid #DDE7D4; border-radius: 9px; padding: 7px 9px; cursor: pointer; }
+        .rdb-selo { margin-left: auto; font-size: 9.5px; font-weight: 700; padding: 3px 7px; border-radius: 20px; background: #055E2B; color: #CDDE35; }
+        .rdb-selo.err { background: #FBE6E3; color: #C0392B; }
       `}</style>
       <div className="rdb">
         <div className="rdb-header">
@@ -199,7 +219,69 @@ export default function PrecificacaoMulticanalPage() {
             </div>
           </section>
 
-          {/* Canais e biblioteca entram nas próximas tasks */}
+          <div className="rdb-chans">
+            {CANAIS_MULTICANAL.map(def => {
+              const r = resultados[def.key]
+              const cfg = canais[def.key]
+              return (
+                <div key={def.key} className="rdb-chan">
+                  <div className="rdb-chan-head">
+                    <span className="rdb-chan-ic" style={{ background: def.cor, color: def.corTexto }}>
+                      {def.nome.slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="rdb-chan-nome">{def.nome}<span>{def.tag}</span></span>
+                    {r && r.lucro < 0 && <span className="rdb-selo err">prejuízo</span>}
+                  </div>
+
+                  {!r ? (
+                    <div className={`rdb-price neg`}>
+                      <div className="lb">Preço ideal de venda</div>
+                      <div className="big">—</div>
+                      <div className="sub">Taxas + margem passam de 100%. Reduza a margem ou os custos.</div>
+                    </div>
+                  ) : (
+                    <div className={`rdb-price ${r.lucro < 0 ? 'neg' : ''}`}>
+                      <div className="lb">Preço ideal de venda</div>
+                      <div className="big">{brl(r.preco)}</div>
+                      <div className="sub">margem de {pctf(r.margem * 100)} · sobra {brl(r.lucro)}</div>
+                    </div>
+                  )}
+
+                  <div className="rdb-fees">
+                    <div className="rdb-field"><label>Margem desejada (%)</label>
+                      <input type="number" step="1" value={cfg.margem}
+                        onChange={e => setCanalField(def.key, 'margem', parseFloat(e.target.value) || 0)} /></div>
+                    <div className="rdb-field"><label>Embalagem (R$)</label>
+                      <input type="number" step="0.01" value={cfg.emb}
+                        onChange={e => setCanalField(def.key, 'emb', parseFloat(e.target.value) || 0)} /></div>
+                    <div className="rdb-field"><label>Comissão (%)</label>
+                      <input type="number" step="0.1" value={cfg.com} disabled={def.autoBand && shAuto}
+                        onChange={e => setCanalField(def.key, 'com', parseFloat(e.target.value) || 0)} /></div>
+                    <div className="rdb-field"><label>Outras taxas (%)</label>
+                      <input type="number" step="0.1" value={cfg.out}
+                        onChange={e => setCanalField(def.key, 'out', parseFloat(e.target.value) || 0)} /></div>
+                    <div className="rdb-field"><label>Taxa fixa (R$)</label>
+                      <input type="number" step="0.01" value={cfg.fix} disabled={def.autoBand && shAuto}
+                        onChange={e => setCanalField(def.key, 'fix', parseFloat(e.target.value) || 0)} /></div>
+                    <div className="rdb-field"><label>Frete (R$)</label>
+                      <input type="number" step="0.01" value={cfg.frete} disabled={def.freteEspecial === 'full'}
+                        onChange={e => setCanalField(def.key, 'frete', parseFloat(e.target.value) || 0)} /></div>
+                    {def.autoBand && (
+                      <label className="rdb-autobox">
+                        <input type="checkbox" checked={shAuto} onChange={e => setShAuto(e.target.checked)} />
+                        Ajustar faixa da Shopee automaticamente (2026)
+                      </label>
+                    )}
+                    {def.freteEspecial === 'full' && !pesoGramas && (
+                      <div style={{ gridColumn: '1/-1', fontSize: 11, color: '#C0392B' }}>
+                        Informe o peso do produto (campo acima) pra calcular o frete FULL.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </>
