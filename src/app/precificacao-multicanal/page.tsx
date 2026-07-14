@@ -163,7 +163,7 @@ export default function PrecificacaoMulticanalPage() {
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .rdb { font-family: 'Montserrat', system-ui, sans-serif; background: #F4F7EF; color: #16241C; margin: -24px; padding: 0 0 40px; min-height: 100vh; }
         .rdb h1, .rdb h2, .rdb h3 { font-family: 'Poppins', sans-serif; }
         .rdb-header { background: #055E2B; color: #fff; padding: 26px 24px 30px; }
@@ -215,7 +215,7 @@ export default function PrecificacaoMulticanalPage() {
         .rdb-libtbl th.r, .rdb-libtbl td.r { text-align: right; }
         .rdb-libtbl td { padding: 8px 10px; border-bottom: 1px solid #EEF2E9; }
         .rdb-iact { border: 1.5px solid #DDE7D4; background: #fff; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; }
-      `}</style>
+      ` }} />
       <div className="rdb">
         <div className="rdb-header">
           <div className="brand">

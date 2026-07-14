@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
   const produtos = await db.produto.findMany({
     where: {
       OR: [
-        { skuPrincipal: { contains: q } },
-        { nome: { contains: q } },
-        { variacoes: { some: { skuVariacao: { contains: q } } } },
+        { skuPrincipal: { contains: q, mode: 'insensitive' } },
+        { nome: { contains: q, mode: 'insensitive' } },
+        { variacoes: { some: { skuVariacao: { contains: q, mode: 'insensitive' } } } },
       ],
     },
     include: {

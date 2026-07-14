@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get('q')?.trim()
 
   const where: Record<string, unknown> = {}
-  if (q) where.OR = [{ sku: { contains: q } }, { nome: { contains: q } }]
+  if (q) where.OR = [{ sku: { contains: q, mode: 'insensitive' } }, { nome: { contains: q, mode: 'insensitive' } }]
 
   const calculos = await db.calculoMulticanal.findMany({
     where,
