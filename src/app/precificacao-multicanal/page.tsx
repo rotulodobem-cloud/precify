@@ -129,7 +129,9 @@ export default function PrecificacaoMulticanalPage() {
     setSkuVariacaoLigado(item.skuVariacao); setCustoProduto(item.custoProduto); setPesoGramas(item.pesoGramas)
     setDespVarPct(item.despesasVariaveisPct); setDespFixPct(item.despesasFixasPct)
     setModo(item.modo === 'margem' ? 'margem' : 'preco'); setPrecoTeste(item.precoTeste || 0)
-    if (item.canais) setCanais(item.canais)
+    const canaisCompletos: CanaisState = {}
+    CANAIS_MULTICANAL.forEach(d => { canaisCompletos[d.key] = item.canais?.[d.key] ?? d.default })
+    setCanais(canaisCompletos)
     setProdutoSel(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
