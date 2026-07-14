@@ -262,7 +262,7 @@ model PedidoItem {
 model CalculoMulticanal {
   id                   String   @id @default(cuid())
   skuVariacao          String?
-  sku                  String
+  sku                  String?
   nome                 String
   variacao             String   @default("")
   custoProduto         Float

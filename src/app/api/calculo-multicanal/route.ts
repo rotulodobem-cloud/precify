@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const variacao = String(b.variacao ?? '').trim()
 
   const data = {
-    sku,
+    sku: sku || null,
     nome: String(b.nome ?? '').trim(),
     variacao,
     skuVariacao: b.skuVariacao || null,
@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     canais: b.canais ?? {},
   }
 
-  // Sem SKU não há chave estável pra upsert (colidiria com outros cálculos
-  // sem SKU em sku_variacao = ('', '')) — cada salvamento vira um registro novo.
+  // Sem SKU não há chave estável pra upsert — cada salvamento vira um registro
+  // novo (sku fica null, e o Postgres nunca colide NULLs num índice único).
   const calculo = sku
     ? await db.calculoMulticanal.upsert({
         where: { sku_variacao: { sku, variacao } },
