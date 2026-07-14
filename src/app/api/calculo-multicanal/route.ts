@@ -40,10 +40,14 @@ export async function POST(req: NextRequest) {
     canais: b.canais ?? {},
   }
 
-  const calculo = await db.calculoMulticanal.upsert({
-    where: { sku_variacao: { sku, variacao } },
-    update: data,
-    create: data,
-  })
+  // Sem SKU não há chave estável pra upsert (colidiria com outros cálculos
+  // sem SKU em sku_variacao = ('', '')) — cada salvamento vira um registro novo.
+  const calculo = sku
+    ? await db.calculoMulticanal.upsert({
+        where: { sku_variacao: { sku, variacao } },
+        update: data,
+        create: data,
+      })
+    : await db.calculoMulticanal.create({ data })
   return NextResponse.json(calculo, { status: 201 })
 }
