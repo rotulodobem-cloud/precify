@@ -146,7 +146,7 @@ export function calcPrecificacaoComFreteML(p: {
       // Usamos o precoAtual se existir, senão fazemos uma estimativa inicial
       // sem frete para depois corrigir iterativamente.
       const precoRef = p.precoAtual ?? estimarPrecoSemFrete(p.custoProduto, p.custoEmbalagem, p.custoColeta, p.comissaoPct, p.impostoPct)
-      freteResolvido = calcFreteFullMLInternal(pesoKg, precoRef)
+      freteResolvido = calcFreteFullML(pesoKg, precoRef)
     }
   }
 
@@ -157,7 +157,7 @@ export function calcPrecificacaoComFreteML(p: {
 }
 
 // ── Tabela FULL inline (evita import circular no server) ─────
-function calcFreteFullMLInternal(pesoKg: number, precoVenda: number): number {
+export function calcFreteFullML(pesoKg: number, precoVenda: number): number {
   const faixasPreco = [
     { min: 0,   max: 18.99 },
     { min: 19,  max: 28.99 },
