@@ -55,7 +55,7 @@ export default function Sidebar() {
             )
           }
           const { href, label, icon: Icon } = item as { href: string; label: string; icon: React.ElementType }
-          const active = path === href || (href !== '/' && path.startsWith(href))
+          const active = path === href || (href !== '/' && path.startsWith(href + '/'))
           return (
             <Link key={href} href={href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all group
