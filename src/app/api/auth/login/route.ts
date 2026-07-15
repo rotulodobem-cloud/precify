@@ -17,8 +17,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 })
   }
 
+  const cookieValue = cookieValueForRole(role)
+  if (!cookieValue) {
+    return NextResponse.json({ error: 'Configuração do servidor incompleta' }, { status: 500 })
+  }
+
   const res = NextResponse.json({ ok: true, role })
-  res.cookies.set('precify_auth', cookieValueForRole(role), {
+  res.cookies.set('precify_auth', cookieValue, {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',

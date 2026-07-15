@@ -22,7 +22,9 @@ export function middleware(request: NextRequest) {
   }
 
   if (role === 'partner') {
-    const allowed = isApi ? pathname.startsWith(PARTNER_API_PREFIX) : pathname === PARTNER_PAGE
+    const allowed = isApi
+      ? (pathname === PARTNER_API_PREFIX || pathname.startsWith(PARTNER_API_PREFIX + '/'))
+      : pathname === PARTNER_PAGE
     if (!allowed) {
       if (isApi) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
       return NextResponse.redirect(new URL(PARTNER_PAGE, request.url))

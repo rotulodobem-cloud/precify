@@ -1,7 +1,9 @@
 export type Role = 'admin' | 'partner'
 
-export function cookieValueForRole(role: Role): string {
-  return `${process.env.NEXTAUTH_SECRET}|${role}`
+export function cookieValueForRole(role: Role): string | null {
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) return null
+  return `${secret}|${role}`
 }
 
 export function roleFromCookie(value: string | undefined): Role | null {
