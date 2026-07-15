@@ -93,9 +93,9 @@ export async function GET(req: NextRequest) {
       const produto = await db.produto.findFirst({
         where: {
           OR: [
-            { skuPrincipal: { contains: sku } },
-            { nome: { contains: sku } },
-            { variacoes: { some: { skuVariacao: { contains: sku } } } }
+            { skuPrincipal: { contains: sku, mode: 'insensitive' } },
+            { nome: { contains: sku, mode: 'insensitive' } },
+            { variacoes: { some: { skuVariacao: { contains: sku, mode: 'insensitive' } } } }
           ]
         },
         include: {

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {}
   if (skuPrincipal) where.skuPrincipal = skuPrincipal
-  if (q) where.OR = [{ skuVariacao: { contains: q } }, { nomeVariacao: { contains: q } }]
+  if (q) where.OR = [{ skuVariacao: { contains: q, mode: 'insensitive' } }, { nomeVariacao: { contains: q, mode: 'insensitive' } }]
 
   const variacoes = await db.variacao.findMany({
     where,

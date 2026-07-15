@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
   const dataFim    = searchParams.get('dataFim')
 
   const where: Record<string, unknown> = {}
-  if (q) where.OR = [{ skuPrincipal: { contains: q } }, { nomeProduto: { contains: q } }]
-  if (fornecedor) where.fornecedor = { contains: fornecedor }
+  if (q) where.OR = [{ skuPrincipal: { contains: q, mode: 'insensitive' } }, { nomeProduto: { contains: q, mode: 'insensitive' } }]
+  if (fornecedor) where.fornecedor = { contains: fornecedor, mode: 'insensitive' }
   if (status) where.statusVariacao = status
   if (dataInicio || dataFim) {
     where.dataCompra = {}

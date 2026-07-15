@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
   const where: Record<string, unknown> = {}
   if (status) where.status = status
   if (q) where.OR = [
-    { skuKit: { contains: q } },
-    { nome: { contains: q } },
+    { skuKit: { contains: q, mode: 'insensitive' } },
+    { nome: { contains: q, mode: 'insensitive' } },
   ]
 
   const kits = await db.kit.findMany({

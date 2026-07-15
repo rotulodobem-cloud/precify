@@ -12,9 +12,9 @@ export async function GET(req: NextRequest) {
   if (plataformaId) where.plataformaId = plataformaId
   if (status && status !== 'TODAS') where.statusMargem = status
   if (q) where.OR = [
-    { skuVariacao: { contains: q } },
-    { variacao: { produto: { nome: { contains: q } } } },
-    { variacao: { produto: { skuPrincipal: { contains: q } } } },
+    { skuVariacao: { contains: q, mode: 'insensitive' } },
+    { variacao: { produto: { nome: { contains: q, mode: 'insensitive' } } } },
+    { variacao: { produto: { skuPrincipal: { contains: q, mode: 'insensitive' } } } },
   ]
 
   const precs = await db.precificacao.findMany({

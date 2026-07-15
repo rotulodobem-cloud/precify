@@ -11,9 +11,9 @@ export async function GET(req: NextRequest) {
   if (status) where.status = status
   if (categoria && categoria !== 'Todas') where.categoria = categoria
   if (q) where.OR = [
-    { nome: { contains: q } },
-    { skuPrincipal: { contains: q } },
-    { categoria: { contains: q } },
+    { nome: { contains: q, mode: 'insensitive' } },
+    { skuPrincipal: { contains: q, mode: 'insensitive' } },
+    { categoria: { contains: q, mode: 'insensitive' } },
   ]
 
   const [produtos, categorias] = await Promise.all([

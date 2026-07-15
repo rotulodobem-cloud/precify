@@ -8,13 +8,13 @@ export async function GET(req: NextRequest) {
 
   // Buscar produto cadastrado
   const produto = await db.produto.findFirst({
-    where: { skuPrincipal: { contains: sku } },
+    where: { skuPrincipal: { contains: sku, mode: 'insensitive' } },
     select: { skuPrincipal: true, nome: true, fornecedorPrincipal: true, custoPorKg: true },
   })
 
   // Buscar última compra desse SKU
   const ultimaCompra = await db.compra.findFirst({
-    where: { skuPrincipal: sku },
+    where: { skuPrincipal: { equals: sku, mode: 'insensitive' } },
     orderBy: { dataCompra: 'desc' },
     select: { nomeProduto: true, fornecedor: true, custoUnitario: true, dataCompra: true },
   })
