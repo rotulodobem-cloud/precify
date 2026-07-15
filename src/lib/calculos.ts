@@ -50,9 +50,9 @@ export function calcPrecoMaximo(ct: number, comissao: number, imposto: number): 
 }
 
 /**
- * Preço promocional = precoIdeal × 1,45
+ * Preço promocional = precoIdeal × 1,40
  *
- * Inflacionado 45% acima do ideal para suportar desconto de até ~31%
+ * Inflacionado 40% acima do ideal para suportar desconto de até ~28,6%
  * mantendo margem acima de 20%.
  */
 export function calcPrecoPromocional(precoIdeal: number): number {
