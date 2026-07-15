@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookieValueForRole, Role } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json()
+  const u = typeof username === 'string' ? username : ''
+  const p = typeof password === 'string' ? password : ''
 
-  if (
-    username === process.env.ADMIN_USER &&
-    password === process.env.ADMIN_PASSWORD
-  ) {
-    const res = NextResponse.json({ ok: true })
-    res.cookies.set('precify_auth', process.env.NEXTAUTH_SECRET!, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 dias
-      path: '/',
-    })
-    return res
+  let role: Role | null = null
+  if (u && process.env.ADMIN_USER && u === process.env.ADMIN_USER && p === process.env.ADMIN_PASSWORD) {
+    role = 'admin'
+  } else if (u && process.env.PARTNER_USER && u === process.env.PARTNER_USER && p === process.env.PARTNER_PASSWORD) {
+    role = 'partner'
   }
 
-  return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 })
+  if (!role) {
+    return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 })
+  }
+
+  const res = NextResponse.json({ ok: true, role })
+  res.cookies.set('precify_auth', cookieValueForRole(role), {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7, // 7 dias
+    path: '/',
+  })
+  return res
 }
