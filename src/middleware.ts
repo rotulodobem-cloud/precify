@@ -1,15 +1,32 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { roleFromCookie } from '@/lib/auth'
+
+const PARTNER_PAGE = '/parceiro'
+const PARTNER_API_PREFIX = '/api/parceiro'
 
 export function middleware(request: NextRequest) {
-  const auth = request.cookies.get('precify_auth')?.value
-  const isLoginPage = request.nextUrl.pathname === '/login'
-  const isApi = request.nextUrl.pathname.startsWith('/api')
+  const { pathname } = request.nextUrl
+  const isApi = pathname.startsWith('/api')
+  const isPublic = pathname === '/login'
+    || pathname === '/api/auth/login'
+    || pathname === '/api/auth/logout'
 
-  if (isApi || isLoginPage) return NextResponse.next()
+  if (isPublic) return NextResponse.next()
 
-  if (auth !== process.env.NEXTAUTH_SECRET) {
+  const role = roleFromCookie(request.cookies.get('precify_auth')?.value)
+
+  if (!role) {
+    if (isApi) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (role === 'partner') {
+    const allowed = isApi ? pathname.startsWith(PARTNER_API_PREFIX) : pathname === PARTNER_PAGE
+    if (!allowed) {
+      if (isApi) return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+      return NextResponse.redirect(new URL(PARTNER_PAGE, request.url))
+    }
   }
 
   return NextResponse.next()
