@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
-  Zap, Truck, Settings, Calculator, Leaf
+  Zap, Truck, Settings, Calculator, Leaf, LogOut
 } from 'lucide-react'
 
 const links = [
@@ -29,6 +29,35 @@ const links = [
 
 export default function Sidebar() {
   const path = usePathname()
+
+  if (path === '/parceiro') {
+    return (
+      <aside className="w-56 shrink-0 bg-gray-900 min-h-screen flex flex-col">
+        <div className="px-4 py-5 border-b border-gray-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+              <Zap size={15} className="text-white" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm leading-none">Precify</p>
+              <p className="text-gray-500 text-[10px] mt-0.5">Parceiro</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1" />
+        <div className="px-2 pb-3 border-t border-gray-800 pt-3">
+          <button
+            onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login' }}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-all w-full text-left"
+          >
+            <LogOut size={15} />
+            <span>Sair</span>
+          </button>
+        </div>
+      </aside>
+    )
+  }
+
   return (
     <aside className="w-56 shrink-0 bg-gray-900 min-h-screen flex flex-col">
       {/* Logo */}
