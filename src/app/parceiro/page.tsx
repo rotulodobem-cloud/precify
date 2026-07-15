@@ -13,20 +13,26 @@ interface LinhaParceiro {
   variacao: { skuVariacao: string; nomeVariacao: string; produto: { nome: string; skuPrincipal: string } }
 }
 
+const PLATAFORMAS = ['Mercado Livre', 'Shopee', 'TikTok Shop']
+
 export default function ParceiroPage() {
   const [linhas, setLinhas] = useState<LinhaParceiro[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const [plataforma, setPlataforma] = useState('')
   const [edit, setEdit] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState<Record<string, boolean>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
-    const r = await fetch(`/api/parceiro/precificacao?q=${encodeURIComponent(q)}`)
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (plataforma) params.set('plataforma', plataforma)
+    const r = await fetch(`/api/parceiro/precificacao?${params}`)
     const d = await r.json()
     setLinhas(Array.isArray(d) ? d : [])
     setLoading(false)
-  }, [q])
+  }, [q, plataforma])
   useEffect(() => { load() }, [load])
 
   const salvarCodigo = async (id: string) => {
@@ -52,6 +58,10 @@ export default function ParceiroPage() {
           <Search size={13} className="text-gray-400" />
           <input className="flex-1 text-sm outline-none bg-transparent" placeholder="Buscar por SKU ou nome…" value={q} onChange={e => setQ(e.target.value)} />
         </div>
+        <select className="inp-sm w-auto" value={plataforma} onChange={e => setPlataforma(e.target.value)}>
+          <option value="">Todas plataformas</option>
+          {PLATAFORMAS.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
         <button onClick={load} className="btn-icon btn-ghost"><RefreshCw size={13} /></button>
         <span className="text-xs text-gray-400">{linhas.length} anúncios</span>
       </div>
@@ -68,7 +78,7 @@ export default function ParceiroPage() {
             {!loading && linhas.length === 0 && <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Nenhum anúncio encontrado.</td></tr>}
             {linhas.map(l => (
               <tr key={l.id} className="border-t border-gray-100">
-                <td className="px-3 py-2 text-sm">{l.variacao.produto.skuPrincipal}</td>
+                <td className="px-3 py-2 text-sm">{l.variacao.skuVariacao}</td>
                 <td className="px-3 py-2 text-sm">{l.variacao.produto.nome}</td>
                 <td className="px-3 py-2 text-sm">{l.variacao.nomeVariacao || '—'}</td>
                 <td className="px-3 py-2 text-sm">{l.plataforma.nome}</td>

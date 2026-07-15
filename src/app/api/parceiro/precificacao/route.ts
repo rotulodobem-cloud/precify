@@ -4,6 +4,7 @@ import db from '@/lib/db'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')?.trim()
+  const plataforma = searchParams.get('plataforma')?.trim()
 
   const where: Record<string, unknown> = {}
   if (q) where.OR = [
@@ -11,6 +12,7 @@ export async function GET(req: NextRequest) {
     { variacao: { produto: { nome: { contains: q, mode: 'insensitive' } } } },
     { variacao: { produto: { skuPrincipal: { contains: q, mode: 'insensitive' } } } },
   ]
+  if (plataforma) where.plataforma = { nome: plataforma }
 
   const precs = await db.precificacao.findMany({
     where,
