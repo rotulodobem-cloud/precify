@@ -73,6 +73,12 @@ incompleta.
    "Mercado Livre Clássico" como valores distintos (mesma convenção
    nome+tag que a tela principal já usa), não só "Mercado Livre" genérico
    pros dois.
+9. **Correção do TikTok Shop, incluída na Parte 1 (antes da migração)**: o
+   motor hoje trata o TikTok como comissão fixa de 6% + R$4 — a regra real
+   é por faixa de preço, igual à Shopee: abaixo de R$50, 10% de comissão +
+   R$4 fixo; a partir de R$50, 6% de comissão + R$6 fixo. Corrigido antes
+   da migração/cobertura completa, pra esses registros já nascerem com o
+   preço certo (evita recalcular tudo de novo depois).
 
 ## Descoberta: `/api/gestao` também depende da Precificação antiga
 
@@ -86,6 +92,26 @@ genérico (ficou registrado como pendência não resolvida) — o
 `CalculoMulticanal`, tendo os dois canais separados, resolve isso de vez.
 
 ## Arquitetura
+
+### Correção do TikTok Shop (`src/lib/calculosMulticanal.ts`)
+
+- Hoje o mecanismo de faixa automática (`autoBand`) só existe pra Shopee —
+  `shopeeBand(preco)` está com a lógica de banda embutida direto dentro de
+  `calcularCanalModoPreco`/`calcularCanalModoAnalise`, específica pra
+  Shopee. Generalizar pra funcionar também com TikTok: extrair uma função
+  `ttBand(preco): { com: number; fix: number }` (abaixo de R$50 → `{com:
+  10, fix: 4}`; a partir de R$50 → `{com: 6, fix: 6}`), marcar
+  `CANAIS_MULTICANAL['tt'].autoBand = true`, e trocar a chamada fixa de
+  `shopeeBand` dentro do motor por uma seleção da função de banda
+  correta conforme o canal (`def.key`), igual já acontece pro resto da
+  configuração por canal.
+- A tela principal ganha o mesmo tipo de toggle "ajustar faixa
+  automaticamente" que a Shopee já tem, agora também pro card do TikTok
+  Shop (hoje esse toggle é uma variável única `shAuto` compartilhada por
+  toda a tela — precisa virar por-canal, já que Shopee e TikTok podem
+  querer ligado/desligado independentemente).
+- Tag do card do TikTok Shop (hoje "6% + frete grátis") atualiza pra
+  refletir a faixa (ex: "faixa automática", igual ao rótulo da Shopee).
 
 ### Schema (`prisma/schema.prisma`)
 
