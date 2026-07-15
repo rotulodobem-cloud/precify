@@ -199,6 +199,10 @@ export default function PrecificacaoMulticanalPage() {
         .rdb-price .big { font-family: 'Poppins'; font-weight: 700; font-size: 28px; margin-top: 2px; }
         .rdb-price .sub { font-size: 11.5px; color: #DCEAD9; margin-top: 2px; }
         .rdb-price.neg .sub { color: #fff; }
+        .rdb-promo { margin: 0 14px 10px; background: #F7FAF3; border: 1px solid #DDE7D4; border-radius: 10px; padding: 9px 12px; }
+        .rdb-promo .lb { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #5C6B60; font-weight: 700; }
+        .rdb-promo .val { font-family: 'Poppins'; font-weight: 700; font-size: 16px; color: #055E2B; margin-top: 1px; }
+        .rdb-promo .sub { font-size: 10.5px; color: #5C6B60; margin-top: 2px; }
         .rdb-fees { padding: 10px 14px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px solid #DDE7D4; margin-top: 4px; }
         .rdb-fees .rdb-field { margin: 0; }
         .rdb-fees .rdb-field label { font-size: 10.5px; }
@@ -291,6 +295,13 @@ export default function PrecificacaoMulticanalPage() {
             </div>
           </section>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '-4px 0 18px' }}>
+            <button className="rdb-btn prim" onClick={salvarCalculo} disabled={salvando}>
+              {salvando ? 'Salvando…' : 'Salvar cálculo'}
+            </button>
+            {msgSalvo && <span style={{ fontSize: 12.5, color: '#5C6B60' }}>{msgSalvo}</span>}
+          </div>
+
           <div className="rdb-chans">
             {CANAIS_MULTICANAL.map(def => {
               const r = resultados[def.key]
@@ -316,6 +327,14 @@ export default function PrecificacaoMulticanalPage() {
                       <div className="lb">Preço ideal de venda</div>
                       <div className="big">{brl(r.preco)}</div>
                       <div className="sub">margem de {pctf(r.margem * 100)} · sobra {brl(r.lucro)}</div>
+                    </div>
+                  )}
+
+                  {r && def.key !== 'lp' && (
+                    <div className="rdb-promo">
+                      <div className="lb">Preço p/ anunciar (+40%)</div>
+                      <div className="val">{brl(r.preco * 1.4)}</div>
+                      <div className="sub">suba o produto por esse valor e depois promocione até {brl(r.preco)}</div>
                     </div>
                   )}
 
@@ -353,13 +372,6 @@ export default function PrecificacaoMulticanalPage() {
                 </div>
               )
             })}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0' }}>
-            <button className="rdb-btn prim" onClick={salvarCalculo} disabled={salvando}>
-              {salvando ? 'Salvando…' : 'Salvar cálculo'}
-            </button>
-            {msgSalvo && <span style={{ fontSize: 12.5, color: '#5C6B60' }}>{msgSalvo}</span>}
           </div>
 
           <section className="rdb-card">

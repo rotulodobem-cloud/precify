@@ -202,7 +202,7 @@ export default function CalculadoraPage() {
         const pMin  = calcPreco(custoFinal, canal.comissao, canal.imposto, 0.20)
         const pIdeal = calcPreco(custoFinal, canal.comissao, canal.imposto, 0.25)
         const pMax  = calcPreco(custoFinal, canal.comissao, canal.imposto, 0.30)
-        const pPromo = Math.round(pIdeal * 1.45 * 100) / 100
+        const pPromo = Math.round(pIdeal * 1.40 * 100) / 100
 
         return {
           canal, frete: Math.round(frete * 100) / 100,
@@ -486,8 +486,8 @@ export default function CalculadoraPage() {
               <div className="px-4 py-2.5 bg-purple-50 border-t border-purple-100 flex items-start gap-2">
                 <Info size={13} color="#a855f7" style={{flexShrink:0, marginTop:2}} />
                 <p className="text-xs text-purple-700">
-                  <strong>Estratégia de preço:</strong> suba o produto com o <strong>preço promocional</strong> (ideal × 1,45).
-                  Ao colocar em promoção com desconto de ~31%, o preço chega ao valor ideal mantendo margem de 25%.
+                  <strong>Estratégia de preço:</strong> suba o produto com o <strong>preço promocional</strong> (ideal × 1,40).
+                  Ao colocar em promoção com desconto de ~28,6%, o preço chega ao valor ideal mantendo margem de 25%.
                 </p>
               </div>
             </div>
