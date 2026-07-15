@@ -57,6 +57,22 @@ incompleta.
    produto sempre que uma compra nova mudar esse custo — o preço
    recalculado aparece automaticamente, sem guardar nem re-sincronizar
    nenhum valor de preço.
+7. **Distinguir "anunciado" de "só calculado"**: hoje, todo canal ganha um
+   preço calculado assim que o produto existe (decisão 4) — isso mistura
+   "preço hipotético, útil pra planejar" com "isso está de fato anunciado
+   na plataforma". Cada canal de marketplace (`mlFull`, `mlClassico`, `sh`,
+   `tt`) ganha uma marcação **anunciado / não anunciado**. Na tela
+   principal, todo canal continua mostrando o preço calculado, mas com
+   indicação visual clara de "ainda sem anúncio" quando não estiver
+   marcado como anunciado. Na tela do parceiro, só aparecem linhas dos
+   canais marcados como anunciados — ele não deve ver preço de canal sem
+   anúncio real. Loja Própria não usa essa marcação (não é uma decisão de
+   "anunciar ou não", é a própria loja da usuária).
+8. **Rótulo Full/Clássico explícito também no parceiro**: a coluna
+   Plataforma na tela do parceiro passa a mostrar "Mercado Livre FULL" /
+   "Mercado Livre Clássico" como valores distintos (mesma convenção
+   nome+tag que a tela principal já usa), não só "Mercado Livre" genérico
+   pros dois.
 
 ## Descoberta: `/api/gestao` também depende da Precificação antiga
 
@@ -73,12 +89,16 @@ genérico (ficou registrado como pendência não resolvida) — o
 
 ### Schema (`prisma/schema.prisma`)
 
-- `CalculoMulticanal` ganha um campo novo: `codigosAnuncio Json?` — mapa
-  `{ mlFull?: string, mlClassico?: string, sh?: string, tt?: string }`
-  (chaves = as mesmas de `CANAIS_MULTICANAL`; `lp` nunca aparece aqui, Loja
-  Própria não tem anúncio pra codificar). Campo separado do `canais`
-  (que guarda só configuração de cálculo), pra não misturar "parâmetro de
-  cálculo" com "metadado operacional".
+- `CalculoMulticanal` ganha dois campos novos:
+  - `codigosAnuncio Json?` — mapa `{ mlFull?: string, mlClassico?: string,
+    sh?: string, tt?: string }` (chaves = as mesmas de `CANAIS_MULTICANAL`;
+    `lp` nunca aparece aqui, Loja Própria não tem anúncio pra codificar).
+  - `canaisAtivos Json?` — mapa `{ mlFull?: boolean, mlClassico?: boolean,
+    sh?: boolean, tt?: boolean }`, marcando se aquele canal tem anúncio
+    real (default `false` quando ausente). `lp` também não aparece aqui
+    (não se aplica).
+  Campos separados do `canais` (que guarda só configuração de cálculo),
+  pra não misturar "parâmetro de cálculo" com "metadado operacional".
 - `Precificacao` e as rotas/telas que dependem só dela são removidas depois
   que a migração for confirmada e tudo estiver repontado (não antes).
 
@@ -96,11 +116,14 @@ genérico (ficou registrado como pendência não resolvida) — o
 ### `/api/parceiro/precificacao` (repontar)
 
 - Passa a ler de `CalculoMulticanal` em vez de `Precificacao`. Cada linha
-  vira: 1 produto × 1 canal de marketplace (`mlFull`, `mlClassico`, `sh`,
-  `tt` — Loja Própria nunca aparece pro parceiro, mesmo comportamento de
-  hoje). Preço de venda e preço promocional calculados na hora com
-  `calcularCanalModoPreco` (mesmo motor da tela principal). Código do
-  anúncio lido/escrito em `codigosAnuncio[canal]`.
+  vira: 1 produto × 1 canal de marketplace **marcado como anunciado**
+  (`canaisAtivos[canal] === true`) — canais sem anúncio real não aparecem
+  pro parceiro, mesmo que já tenham um preço calculado. Coluna Plataforma
+  mostra "Mercado Livre FULL" / "Mercado Livre Clássico" / "Shopee" /
+  "TikTok Shop" (rótulo explícito, não genérico). Preço de venda e preço
+  promocional calculados na hora com `calcularCanalModoPreco` (mesmo motor
+  da tela principal). Código do anúncio lido/escrito em
+  `codigosAnuncio[canal]`.
 - Mesma regra de segurança de antes (a que já existe e foi revisada): só os
   campos permitidos saem no `select`/resposta, nunca custo/margem/comissão
   em bruto — aqui não tem "select" de banco pra restringir campo, já que o
@@ -123,11 +146,14 @@ genérico (ficou registrado como pendência não resolvida) — o
   `tipoFreteML` pro canal (`ml`+`full`→`mlFull`, `ml`+`classico`→`mlClassico`,
   `shopee`→`sh`, `tiktok`→`tt`). Encontrar ou criar o `CalculoMulticanal` do
   produto/variação correspondente. Preencher `canais[canal]` com os valores
-  equivalentes (comissão, taxa, frete, embalagem) e `codigosAnuncio[canal]`
-  com o `codigoAnuncio` antigo, se houver. Preço final recalculado do zero
-  pela metodologia nova, não copiado do antigo.
+  equivalentes (comissão, taxa, frete, embalagem), `codigosAnuncio[canal]`
+  com o `codigoAnuncio` antigo (se houver), e `canaisAtivos[canal] = true`
+  (esses registros representam anúncios reais que já existiam). Preço
+  final recalculado do zero pela metodologia nova, não copiado do antigo.
 - Produtos/variações sem nenhum registro em nenhum dos dois sistemas:
-  criar `CalculoMulticanal` com os 5 canais em valores padrão.
+  criar `CalculoMulticanal` com os 5 canais em valores padrão e
+  `canaisAtivos` todo `false` (preço só de referência, nada anunciado
+  ainda até a usuária confirmar).
 - Backup completo antes de rodar (`node scripts/backup-db.js`), e um
   relatório (arquivo, não só console) comparando preço antigo × novo por
   SKU×canal, pra usuária revisar antes de considerar a migração concluída.
