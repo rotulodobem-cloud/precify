@@ -56,7 +56,7 @@ export function calcPrecoMaximo(ct: number, comissao: number, imposto: number): 
  * mantendo margem acima de 20%.
  */
 export function calcPrecoPromocional(precoIdeal: number): number {
-  return round2(precoIdeal * 1.45)
+  return round2(precoIdeal * 1.40)
 }
 
 /** Margem bruta sobre receita bruta */
