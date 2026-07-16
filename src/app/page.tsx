@@ -25,20 +25,34 @@ export default function DashboardPage() {
   const [lotesVencendo, setLotesVencendo] = useState<number | null>(null)
   const [mes, setMes] = useState(new Date().toISOString().slice(0, 7))
   const [fornecedor, setFornecedor] = useState('')
+  const [fornecedorDebounced, setFornecedorDebounced] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setFornecedorDebounced(fornecedor), 400)
+    return () => clearTimeout(t)
+  }, [fornecedor])
 
   const load = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams({ mes })
-    if (fornecedor) params.set('fornecedor', fornecedor)
-    const [r, rLotes] = await Promise.all([
-      fetch('/api/dashboard?' + params),
-      fetch('/api/lotes?vencendo=1'),
-    ])
-    setData(await r.json())
-    const lotes = await rLotes.json()
-    setLotesVencendo(Array.isArray(lotes) ? lotes.length : 0)
-    setLoading(false)
-  }, [mes, fornecedor])
+    setError(null)
+    try {
+      const params = new URLSearchParams({ mes })
+      if (fornecedorDebounced) params.set('fornecedor', fornecedorDebounced)
+      const [r, rLotes] = await Promise.all([
+        fetch('/api/dashboard?' + params),
+        fetch('/api/lotes?vencendo=1'),
+      ])
+      if (!r.ok || !rLotes.ok) throw new Error('Falha ao carregar dashboard')
+      setData(await r.json())
+      const lotes = await rLotes.json()
+      setLotesVencendo(Array.isArray(lotes) ? lotes.length : 0)
+    } catch {
+      setError('Não foi possível carregar os dados do dashboard. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }, [mes, fornecedorDebounced])
   useEffect(() => { load() }, [load])
 
   return (
@@ -61,6 +75,12 @@ export default function DashboardPage() {
         <Link href="/lotes" className="block bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 hover:bg-amber-100 transition-colors">
           <strong>{lotesVencendo}</strong> {lotesVencendo === 1 ? 'lote está vencido ou vence' : 'lotes estão vencidos ou vencem'} nos próximos 30 dias — clique para ver.
         </Link>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
