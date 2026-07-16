@@ -14,6 +14,13 @@ const CANAIS_EXTERNOS = ['lp', 'mlFull', 'mlClassico', 'sh', 'tt']
 const SLUG_EXTERNO: Record<string, string> = {
   lp: 'loja_propria', mlFull: 'ml_full', mlClassico: 'ml_classico', sh: 'shopee', tt: 'tiktok',
 }
+// Só ML Full/Clássico precisam de sufixo pro nome ficar distinguível --
+// "Shopee"/"TikTok Shop" já são únicos sozinhos, e o `tag` deles é uma
+// frase descritiva (ex: "faixa automática"), não um sufixo de nome.
+const NOME_EXTERNO: Record<string, string> = {
+  lp: 'Loja Própria', mlFull: 'Mercado Livre FULL', mlClassico: 'Mercado Livre Clássico',
+  sh: 'Shopee', tt: 'TikTok Shop',
+}
 
 function montarAnuncios(c: {
   custoProduto: number; pesoGramas: number | null
@@ -175,7 +182,7 @@ export async function GET(req: NextRequest) {
     // ── 4. PLATAFORMAS E TAXAS ────────────────────────────────────────────
     if (tipo === 'plataformas') {
       const plataformas = CANAIS_MULTICANAL.map(def => ({
-        slug: SLUG_EXTERNO[def.key], nome: def.nome + (def.tag && def.key !== 'lp' ? ` ${def.tag}` : ''),
+        slug: SLUG_EXTERNO[def.key], nome: NOME_EXTERNO[def.key],
         comissaoPct: def.default.com / 100, taxaFixa: def.default.fix, impostoPct: null,
       }))
       return NextResponse.json({ ok: true, data: plataformas }, { headers: CORS_HEADERS })
@@ -245,7 +252,7 @@ export async function GET(req: NextRequest) {
           impostoMes,
           porCanal,
           plataformas: CANAIS_MULTICANAL.map(def => ({
-            slug: SLUG_EXTERNO[def.key], nome: def.nome,
+            slug: SLUG_EXTERNO[def.key], nome: NOME_EXTERNO[def.key],
             comissaoPct: def.default.com / 100, taxaFixa: def.default.fix, impostoPct: null,
           }))
         }
