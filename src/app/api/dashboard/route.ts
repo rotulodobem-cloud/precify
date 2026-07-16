@@ -1,108 +1,102 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { CANAIS_MULTICANAL, calcularCanalModoPreco } from '@/lib/calculosMulticanal'
 
-export async function GET() {
-  const [precs, compras, plataformas] = await Promise.all([
-    db.precificacao.findMany({
-      include: {
-        variacao: { include: { produto: { select: { nome: true, skuPrincipal: true, categoria: true } } } },
-        plataforma: true,
-      },
-    }),
-    db.compra.findMany({ orderBy: { dataCompra: 'desc' }, take: 200 }),
-    db.plataforma.findMany({ where: { ativa: true } }),
-  ])
+const DIAS_PARADO = 60
 
-  const total = precs.length
-  const saudavel = precs.filter(p => p.statusMargem === 'SAUDAVEL').length
-  const atencao  = precs.filter(p => p.statusMargem === 'ATENCAO').length
-  const prejuizo = precs.filter(p => p.statusMargem === 'PREJUIZO').length
-  const semPreco = precs.filter(p => !p.precoAtual).length
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const mes = searchParams.get('mes') || new Date().toISOString().slice(0, 7)
+  const fornecedorFiltro = searchParams.get('fornecedor')?.trim()
 
-  const comPreco = precs.filter(p => p.margemAtual !== null)
-  const margemMedia = comPreco.length
-    ? comPreco.reduce((a, p) => a + (p.margemAtual ?? 0), 0) / comPreco.length
-    : 0
+  const [ano, mesNum] = mes.split('-').map(Number)
+  const inicio = new Date(ano, mesNum - 1, 1)
+  const fim = new Date(ano, mesNum, 0, 23, 59, 59)
 
-  // Alertas agrupados
-  const alertas = [
-    ...precs
-      .filter(p => p.statusMargem === 'PREJUIZO' && p.precoAtual)
-      .slice(0, 15)
-      .map(p => ({ tipo: 'PREJUIZO', sku: p.skuVariacao, produto: p.variacao.produto.nome, plataforma: p.plataforma.nome, margem: p.margemAtual, precoAtual: p.precoAtual, precoIdeal: p.precoIdeal })),
-    ...precs
-      .filter(p => p.statusMargem === 'ATENCAO')
-      .slice(0, 10)
-      .map(p => ({ tipo: 'ATENCAO', sku: p.skuVariacao, produto: p.variacao.produto.nome, plataforma: p.plataforma.nome, margem: p.margemAtual, precoAtual: p.precoAtual, precoIdeal: p.precoIdeal })),
-    ...compras
-      .filter(c => c.statusVariacao === 'AUMENTOU > 5%')
-      .slice(0, 10)
-      .map(c => ({ tipo: 'CUSTO_AUMENTO', sku: c.skuPrincipal, produto: c.nomeProduto, plataforma: '', margem: null, precoAtual: null, precoIdeal: null, extra: `${((c.variacaoPct ?? 0) * 100).toFixed(1)}% ↑ R$${c.custoAnterior?.toFixed(2)} → R$${c.custoUnitario.toFixed(2)}` })),
-    ...precs
-      .filter(p => !p.precoAtual)
-      .slice(0, 8)
-      .map(p => ({ tipo: 'SEM_PRECO', sku: p.skuVariacao, produto: p.variacao.produto.nome, plataforma: p.plataforma.nome, margem: null, precoAtual: null, precoIdeal: p.precoIdeal })),
-  ]
+  const whereCompras: Record<string, unknown> = { dataCompra: { gte: inicio, lte: fim } }
+  if (fornecedorFiltro) whereCompras.fornecedor = { contains: fornecedorFiltro, mode: 'insensitive' }
 
-  // Comparativo ML × Shopee
-  const ml     = plataformas.find(p => p.slug === 'ml')
-  const shopee = plataformas.find(p => p.slug === 'shopee')
-  const comparativo = []
+  const compras = await db.compra.findMany({ where: whereCompras })
 
-  if (ml && shopee) {
-    const mlPrecs = precs.filter(p => p.plataformaId === ml.id)
-    for (const mp of mlPrecs.slice(0, 25)) {
-      const sp = precs.find(p => p.skuVariacao === mp.skuVariacao && p.plataformaId === shopee.id)
-      if (sp) {
-        comparativo.push({
-          sku: mp.skuVariacao,
-          produto: mp.variacao.produto.nome,
-          variacao: mp.variacao.produto.nome,
-          margemML: mp.margemAtual,
-          margemShopee: sp.margemAtual,
-          precoIdealML: mp.precoIdeal,
-          precoIdealShopee: sp.precoIdeal,
-          precoAtualML: mp.precoAtual,
-          precoAtualShopee: sp.precoAtual,
-          melhor: (mp.margemAtual ?? -1) >= (sp.margemAtual ?? -1) ? 'ML' : 'Shopee',
-        })
-      }
+  const gastoTotal = compras.reduce((a, c) => a + c.custoTotal, 0)
+
+  const porFornecedor = new Map<string, number>()
+  for (const c of compras) porFornecedor.set(c.fornecedor, (porFornecedor.get(c.fornecedor) ?? 0) + c.custoTotal)
+  const fornecedores = [...porFornecedor.entries()]
+    .map(([fornecedor, total]) => ({ fornecedor, total: Math.round(total * 100) / 100 }))
+    .sort((a, b) => b.total - a.total)
+
+  const comprasComVariacao = compras.filter(c => c.statusVariacao === 'AUMENTOU > 5%' || c.statusVariacao === 'DIMINUIU > 5%')
+  const skusComVariacao = [...new Set(comprasComVariacao.map(c => c.skuPrincipal))]
+  const calculosDosSkus = skusComVariacao.length
+    ? await db.calculoMulticanal.findMany({
+        where: { sku: { in: skusComVariacao } },
+        select: { sku: true, nome: true, canaisAtivos: true },
+      })
+    : []
+  const skusComAnuncio = new Set(
+    calculosDosSkus
+      .filter(c => c.canaisAtivos && Object.values(c.canaisAtivos as Record<string, boolean>).some(Boolean))
+      .map(c => c.sku)
+  )
+  const nomesPorSku = new Map(calculosDosSkus.map(c => [c.sku, c.nome]))
+  const produtosPraAjustar = comprasComVariacao
+    .filter(c => skusComAnuncio.has(c.skuPrincipal))
+    .map(c => ({
+      sku: c.skuPrincipal,
+      nome: nomesPorSku.get(c.skuPrincipal) ?? c.nomeProduto,
+      direcao: c.statusVariacao === 'AUMENTOU > 5%' ? 'aumentou' : 'diminuiu',
+      variacaoPct: c.variacaoPct != null ? Math.round(c.variacaoPct * 10000) / 100 : null,
+      dataCompra: c.dataCompra,
+    }))
+    .filter((v, i, arr) => arr.findIndex(x => x.sku === v.sku) === i)
+
+  const produtos = await db.produto.findMany({ where: { status: 'ativo' }, select: { skuPrincipal: true, categoria: true } })
+  const categoriaPorSku = new Map(produtos.map(p => [p.skuPrincipal, p.categoria]))
+  const todosCalculos = await db.calculoMulticanal.findMany({
+    select: { sku: true, custoProduto: true, pesoGramas: true, despesasVariaveisPct: true, despesasFixasPct: true, canais: true, canaisAtivos: true },
+  })
+  const margensPorCategoria = new Map<string, number[]>()
+  for (const calc of todosCalculos) {
+    const categoria = calc.sku ? categoriaPorSku.get(calc.sku) : null
+    if (!categoria) continue
+    const ativos = (calc.canaisAtivos ?? {}) as Record<string, boolean>
+    const canaisCfg = (calc.canais ?? {}) as Record<string, Record<string, number>>
+    for (const key of Object.keys(ativos)) {
+      if (!ativos[key]) continue
+      const def = CANAIS_MULTICANAL.find(d => d.key === key)
+      const cfg = canaisCfg[key]
+      if (!def || !cfg) continue
+      const r = calcularCanalModoPreco({
+        custoProduto: calc.custoProduto, despVarPct: calc.despesasVariaveisPct, despFixPct: calc.despesasFixasPct,
+        pesoGramas: calc.pesoGramas, canal: cfg as any, def, shAuto: true,
+      })
+      if (!r) continue
+      if (!margensPorCategoria.has(categoria)) margensPorCategoria.set(categoria, [])
+      margensPorCategoria.get(categoria)!.push(r.margem)
     }
   }
+  const porCategoria = [...margensPorCategoria.entries()]
+    .map(([categoria, margens]) => ({
+      categoria,
+      margemMedia: Math.round((margens.reduce((a, m) => a + m, 0) / margens.length) * 10000) / 100,
+      n: margens.length,
+    }))
+    .sort((a, b) => b.margemMedia - a.margemMedia)
 
-  // Margem por plataforma
-  const porPlataforma = plataformas.map(p => {
-    const pp = precs.filter(pr => pr.plataformaId === p.id && pr.margemAtual !== null)
-    const media = pp.length ? pp.reduce((a, pr) => a + (pr.margemAtual ?? 0), 0) / pp.length : null
-    return { plataforma: p.nome, slug: p.slug, cor: p.corHex, media, total: precs.filter(pr => pr.plataformaId === p.id).length }
+  const limite = new Date()
+  limite.setDate(limite.getDate() - DIAS_PARADO)
+  const produtosParados = await db.produto.findMany({
+    where: { status: 'ativo', OR: [{ dataUltimaCompra: { lt: limite } }, { dataUltimaCompra: null }] },
+    select: { skuPrincipal: true, nome: true, dataUltimaCompra: true },
+    orderBy: { dataUltimaCompra: 'asc' },
+    take: 30,
   })
 
-  // Margem por categoria
-  const cats: Record<string, number[]> = {}
-  for (const p of precs) {
-    const cat = p.variacao.produto.categoria
-    if (p.margemAtual !== null) {
-      cats[cat] = cats[cat] ?? []
-      cats[cat].push(p.margemAtual)
-    }
-  }
-  const porCategoria = Object.entries(cats)
-    .map(([cat, vals]) => ({ categoria: cat, media: vals.reduce((a, v) => a + v, 0) / vals.length, n: vals.length }))
-    .sort((a, b) => b.media - a.media)
-
   return NextResponse.json({
-    metricas: {
-      totalProdutos: await db.produto.count({ where: { status: 'ativo' } }),
-      totalVariacoes: await db.variacao.count({ where: { status: 'ativo' } }),
-      totalPrecificacoes: total,
-      totalCompras: await db.compra.count(),
-      saudavel, atencao, prejuizo, semPreco, margemMedia,
-    },
-    alertas: alertas.slice(0, 30),
-    comparativo,
-    porPlataforma,
-    porCategoria,
-    comprasRecentes: compras.slice(0, 8),
-    custosAlterados: compras.filter(c => c.statusVariacao === 'AUMENTOU > 5%').slice(0, 5),
+    mes, fornecedorFiltro: fornecedorFiltro ?? null,
+    gastoTotal: Math.round(gastoTotal * 100) / 100,
+    totalCompras: compras.length,
+    fornecedores, produtosPraAjustar, porCategoria, produtosParados,
   })
 }
