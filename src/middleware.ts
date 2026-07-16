@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
   const isPublic = pathname === '/login'
     || pathname === '/api/auth/login'
     || pathname === '/api/auth/logout'
+    || pathname === '/api/gestao'
 
   if (isPublic) return NextResponse.next()
 
