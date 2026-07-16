@@ -47,6 +47,11 @@ export async function recalcularVariacoesEPrecificacoes(skuPrincipal: string, cu
         },
       })
     }
+
+    await db.calculoMulticanal.updateMany({
+      where: { skuVariacao: v.skuVariacao },
+      data: { custoProduto: novoCustoTotal ?? novoCustoCalc ?? 0, pesoGramas: v.pesoGramas },
+    })
   }
 }
 
