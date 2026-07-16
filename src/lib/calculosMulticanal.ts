@@ -29,8 +29,8 @@ export const CANAIS_MULTICANAL: CanalDef[] = [
     default: { emb: 1.50, com: 14, out: 0, fix: 6.25, frete: 12, margem: 20 } },
   { key: 'sh', nome: 'Shopee', tag: 'faixa automática', cor: '#EE4D2D', corTexto: '#fff', autoBand: true,
     default: { emb: 1.50, com: 20, out: 0, fix: 4, frete: 12, margem: 20 } },
-  { key: 'tt', nome: 'TikTok Shop', tag: '6% + frete grátis', cor: '#111111', corTexto: '#fff',
-    default: { emb: 1.50, com: 6, out: 6, fix: 4, frete: 12, margem: 20 } },
+  { key: 'tt', nome: 'TikTok Shop', tag: 'faixa automática', cor: '#111111', corTexto: '#fff', autoBand: true,
+    default: { emb: 1.50, com: 10, out: 6, fix: 4, frete: 12, margem: 20 } },
 ]
 
 export function shopeeBand(preco: number): { com: number; fix: number } {
@@ -38,6 +38,16 @@ export function shopeeBand(preco: number): { com: number; fix: number } {
   if (preco <= 99.99) return { com: 14, fix: 16 }
   if (preco <= 199.99) return { com: 14, fix: 20 }
   return { com: 14, fix: 26 }
+}
+
+export function ttBand(preco: number): { com: number; fix: number } {
+  if (preco < 50) return { com: 10, fix: 4 }
+  return { com: 6, fix: 6 }
+}
+
+const FAIXAS_POR_CANAL: Record<string, { fn: (preco: number) => { com: number; fix: number }; faixas: { min: number; max: number }[] }> = {
+  sh: { fn: shopeeBand, faixas: [{ min: 0, max: 79.99 }, { min: 80, max: 99.99 }, { min: 100, max: 199.99 }, { min: 200, max: Infinity }] },
+  tt: { fn: ttBand, faixas: [{ min: 0, max: 49.99 }, { min: 50, max: Infinity }] },
 }
 
 export interface ResultadoCanal {
@@ -120,11 +130,12 @@ export function calcularCanalModoPreco(params: {
   }
 
   if (def.autoBand && shAuto) {
-    const bandas = [{ min: 0, max: 79.99 }, { min: 80, max: 99.99 }, { min: 100, max: 199.99 }, { min: 200, max: Infinity }]
+    const config = FAIXAS_POR_CANAL[def.key]
+    if (!config) return null
     let melhor: { preco: number; com: number; fix: number } | null = null
     let menorDist = Infinity
-    for (const b of bandas) {
-      const banda = shopeeBand(b.min === 0 ? 50 : b.min)
+    for (const b of config.faixas) {
+      const banda = config.fn(b.min)
       const p = calcularPrecoSimples(custoProduto, despVarPct, despFixPct, canal, banda.com, canal.out, banda.fix, canal.frete, canal.margem)
       if (p === null) continue
       if (p >= b.min && p <= b.max) return montarResultado(p, custoProduto, despVarPct, despFixPct, canal, banda.com, banda.fix, canal.frete)
@@ -161,8 +172,8 @@ export function calcularCanalModoAnalise(params: {
     frete = calcFreteFullML(pesoGramas / 1000, precoTeste)
   }
   if (def.autoBand && shAuto) {
-    const banda = shopeeBand(precoTeste)
-    com = banda.com; fix = banda.fix
+    const config = FAIXAS_POR_CANAL[def.key]
+    if (config) { const banda = config.fn(precoTeste); com = banda.com; fix = banda.fix }
   }
 
   return montarResultado(precoTeste, custoProduto, despVarPct, despFixPct, canal, com, fix, frete)
