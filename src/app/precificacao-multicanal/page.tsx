@@ -40,7 +40,8 @@ export default function PrecificacaoMulticanalPage() {
 
   // Canais
   const [canais, setCanais] = useState<CanaisState>(canaisIniciais())
-  const [shAuto, setShAuto] = useState(true)
+  const [autoStates, setAutoStates] = useState<Record<string, boolean>>({ sh: true, tt: true })
+  const [canaisAtivos, setCanaisAtivos] = useState<Record<string, boolean>>({})
 
   // Biblioteca
   const [biblioteca, setBiblioteca] = useState<any[]>([])
@@ -92,6 +93,7 @@ export default function PrecificacaoMulticanalPage() {
     setProdutoSel(null); setSkuVariacaoLigado(null)
     setSku(''); setNome(''); setVariacaoTxt(''); setCustoProduto(0); setPesoGramas(null)
     setQ(''); setSugestoes([])
+    setCanaisAtivos({})
   }
 
   const setCanalField = (key: string, field: keyof CanalConfig, valor: number) => {
@@ -114,7 +116,7 @@ export default function PrecificacaoMulticanalPage() {
       body: JSON.stringify({
         sku, nome, variacao: variacaoTxt, skuVariacao: skuVariacaoLigado,
         custoProduto, pesoGramas, despesasVariaveisPct: despVarPct, despesasFixasPct: despFixPct,
-        modo, precoTeste, canais,
+        modo, precoTeste, canais, canaisAtivos,
       }),
     })
     setSalvando(false)
@@ -132,6 +134,7 @@ export default function PrecificacaoMulticanalPage() {
     const canaisCompletos: CanaisState = {}
     CANAIS_MULTICANAL.forEach(d => { canaisCompletos[d.key] = item.canais?.[d.key] ?? d.default })
     setCanais(canaisCompletos)
+    setCanaisAtivos(item.canaisAtivos ?? {})
     setProdutoSel(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -156,6 +159,7 @@ export default function PrecificacaoMulticanalPage() {
 
   const resultados: Record<string, ResultadoCanal | null> = {}
   CANAIS_MULTICANAL.forEach(def => {
+    const shAuto = autoStates[def.key] ?? true
     resultados[def.key] = modo === 'preco'
       ? calcularCanalModoPreco({ custoProduto, despVarPct, despFixPct, pesoGramas, canal: canais[def.key], def, shAuto })
       : calcularCanalModoAnalise({ custoProduto, despVarPct, despFixPct, pesoGramas, precoTeste, canal: canais[def.key], def, shAuto })
@@ -313,8 +317,17 @@ export default function PrecificacaoMulticanalPage() {
                       {def.nome.slice(0, 2).toUpperCase()}
                     </span>
                     <span className="rdb-chan-nome">{def.nome}<span>{def.tag}</span></span>
+                    {def.key !== 'lp' && !canaisAtivos[def.key] && <span className="rdb-selo" style={{ background: '#EEF2E9', color: '#5C6B60' }}>sem anúncio</span>}
                     {r && r.lucro < 0 && <span className="rdb-selo err">prejuízo</span>}
                   </div>
+
+                  {def.key !== 'lp' && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#5C6B60', padding: '6px 14px 0' }}>
+                      <input type="checkbox" checked={canaisAtivos[def.key] ?? false}
+                        onChange={e => setCanaisAtivos(s => ({ ...s, [def.key]: e.target.checked }))} />
+                      Anunciado nesta plataforma
+                    </label>
+                  )}
 
                   {!r ? (
                     <div className={`rdb-price neg`}>
@@ -346,21 +359,22 @@ export default function PrecificacaoMulticanalPage() {
                       <input type="number" step="0.01" value={cfg.emb}
                         onChange={e => setCanalField(def.key, 'emb', parseFloat(e.target.value) || 0)} /></div>
                     <div className="rdb-field"><label>Comissão (%)</label>
-                      <input type="number" step="0.1" value={cfg.com} disabled={def.autoBand && shAuto}
+                      <input type="number" step="0.1" value={cfg.com} disabled={def.autoBand && (autoStates[def.key] ?? true)}
                         onChange={e => setCanalField(def.key, 'com', parseFloat(e.target.value) || 0)} /></div>
                     <div className="rdb-field"><label>Outras taxas (%)</label>
                       <input type="number" step="0.1" value={cfg.out}
                         onChange={e => setCanalField(def.key, 'out', parseFloat(e.target.value) || 0)} /></div>
                     <div className="rdb-field"><label>Taxa fixa (R$)</label>
-                      <input type="number" step="0.01" value={cfg.fix} disabled={def.autoBand && shAuto}
+                      <input type="number" step="0.01" value={cfg.fix} disabled={def.autoBand && (autoStates[def.key] ?? true)}
                         onChange={e => setCanalField(def.key, 'fix', parseFloat(e.target.value) || 0)} /></div>
                     <div className="rdb-field"><label>Frete (R$)</label>
                       <input type="number" step="0.01" value={cfg.frete} disabled={def.freteEspecial === 'full'}
                         onChange={e => setCanalField(def.key, 'frete', parseFloat(e.target.value) || 0)} /></div>
                     {def.autoBand && (
                       <label className="rdb-autobox">
-                        <input type="checkbox" checked={shAuto} onChange={e => setShAuto(e.target.checked)} />
-                        Ajustar faixa da Shopee automaticamente (2026)
+                        <input type="checkbox" checked={autoStates[def.key] ?? true}
+                          onChange={e => setAutoStates(s => ({ ...s, [def.key]: e.target.checked }))} />
+                        Ajustar faixa automaticamente
                       </label>
                     )}
                     {def.freteEspecial === 'full' && !pesoGramas && (

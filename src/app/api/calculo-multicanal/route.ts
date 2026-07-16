@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     modo: b.modo === 'margem' ? 'margem' : 'preco',
     precoTeste: b.precoTeste != null ? parseFloat(b.precoTeste) : null,
     canais: b.canais ?? {},
+    canaisAtivos: b.canaisAtivos ?? {},
   }
 
   // Sem SKU não há chave estável pra upsert — cada salvamento vira um registro
