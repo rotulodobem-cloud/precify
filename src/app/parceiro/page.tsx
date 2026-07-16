@@ -13,7 +13,7 @@ interface LinhaParceiro {
   variacao: { skuVariacao: string; nomeVariacao: string; produto: { nome: string; skuPrincipal: string } }
 }
 
-const PLATAFORMAS = ['Mercado Livre', 'Shopee', 'TikTok Shop']
+const PLATAFORMAS = ['Mercado Livre FULL', 'Mercado Livre Clássico', 'Shopee', 'TikTok Shop']
 
 export default function ParceiroPage() {
   const [linhas, setLinhas] = useState<LinhaParceiro[]>([])
