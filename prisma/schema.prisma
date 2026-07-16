@@ -272,6 +272,8 @@ model CalculoMulticanal {
   modo                 String   @default("preco")
   precoTeste           Float?
   canais               Json
+  codigosAnuncio       Json?
+  canaisAtivos         Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
