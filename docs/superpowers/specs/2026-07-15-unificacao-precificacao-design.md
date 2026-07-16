@@ -125,8 +125,14 @@ genérico (ficou registrado como pendência não resolvida) — o
     (não se aplica).
   Campos separados do `canais` (que guarda só configuração de cálculo),
   pra não misturar "parâmetro de cálculo" com "metadado operacional".
-- `Precificacao` e as rotas/telas que dependem só dela são removidas depois
-  que a migração for confirmada e tudo estiver repontado (não antes).
+- `Precificacao` **continua existindo no schema até o fim da Onda B** —
+  ela ainda alimenta os 5 pontos descobertos (Dashboard, Variações, Busca,
+  Exportar, Importar) até serem repontados. Na Onda A, só as **rotas
+  editáveis** (`/calculadora`, `/precificacao` e suas APIs de
+  criar/editar) são removidas — o model e a sincronização de custo
+  (`saveCompra.ts`) continuam rodando, mantendo os dados existentes vivos
+  e atualizados (mesmo que congelados pra edição) até a Onda B terminar de
+  repontar tudo e só então remover o model de vez.
 
 ### Sincronização de custo (substitui "recálculo automático")
 
@@ -183,6 +189,40 @@ genérico (ficou registrado como pendência não resolvida) — o
 - Backup completo antes de rodar (`node scripts/backup-db.js`), e um
   relatório (arquivo, não só console) comparando preço antigo × novo por
   SKU×canal, pra usuária revisar antes de considerar a migração concluída.
+
+## Descoberta: mais 5 telas/funções dependem da Precificação antiga
+
+Mapeando o código, além de `/calculadora` e `/precificacao` (já previstas),
+mais 5 pontos leem `Precificacao` diretamente e quebrariam/congelariam se o
+model fosse removido sem tratar:
+
+- **`/api/dashboard`** (painel inicial) — contadores saudável/atenção/
+  prejuízo, alertas de produtos com prejuízo, comparativo ML×Shopee, média
+  de margem por plataforma e por categoria. Lógica própria, não é só trocar
+  a fonte — precisa ser redesenhada em cima do `CalculoMulticanal`
+  (comparativo generaliza pra todos os canais de marketplace, não só
+  ML×Shopee; "sem preço" deixa de existir como conceito — já que todo
+  produto tem preço calculado — e vira "sem canal anunciado").
+- **`/variacoes`** e **`/busca`** — mostram um resumo/etiqueta de
+  precificação por plataforma inline na lista. Passam a mostrar o
+  equivalente calculado a partir do `CalculoMulticanal` (só canais
+  anunciados, mesma regra da tela do parceiro).
+- **`/api/exportar`** — a aba "Precificação" da planilha XLSX exportada
+  vira uma linha por SKU×canal do `CalculoMulticanal` em vez de
+  SKU×Plataforma da tabela antiga.
+- **`/api/importar`** — a função `importarPrecificacao` (abas ML/Shopee/
+  TikTok/Magalu) hoje cria registros direto em `Precificacao`. Passa a
+  criar/atualizar `CalculoMulticanal` em vez disso, mapeando aba → canal
+  (a aba "Magalu" já não bate em nenhuma plataforma ativa hoje — desde a
+  remoção da plataforma Magalu num plano anterior — e continua sendo
+  ignorada, sem mudança de comportamento aí).
+
+**Decisão da usuária**: migrar tudo isso também, mas em duas ondas dentro
+desta mesma Parte 1 — **Onda A** (motor único, correção do TikTok,
+sincronização de custo, tela principal, `/parceiro`, `/api/gestao`, remoção
+das telas antigas — já desenhada acima) vai pra execução primeiro. **Onda
+B** (Dashboard, Variações, Busca, Exportar, Importar) ganha desenho próprio
+logo depois, sem atrasar a Onda A.
 
 ## Fora de escopo (fica pra Parte 2, próximo ciclo)
 
