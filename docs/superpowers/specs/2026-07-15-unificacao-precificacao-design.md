@@ -188,6 +188,14 @@ genérico (ficou registrado como pendência não resolvida) — o
 
 - Planner/checklist de atualização de preço na Loja Própria (usuária pediu
   explicitamente que fosse depois desta parte, já que depende dela).
+  Ideia já capturada em conversa, pra retomar no desenho da Parte 2: em vez
+  de avisar a cada variação de custo entre lotes, o planner compara o
+  preço calculado agora (que já fica sempre atualizado sozinho, graças à
+  sincronização de custo desta Parte 1, alimentada a cada compra lançada)
+  contra o preço que está de fato na loja, e só avisa quando a diferença
+  passar de uma margem de tolerância configurável (ex: queda de margem
+  abaixo de X%) — evita ruído de repreficar a cada pequena oscilação de
+  custo entre lotes.
 - Qualquer alteração de fluxo pro parceiro além do repontamento de dados
   (a tela `/parceiro` continua igual, só troca a fonte por baixo).
 
