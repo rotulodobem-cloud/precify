@@ -163,7 +163,7 @@ export default function KitsPage() {
           <p className="text-sm text-gray-500 mt-0.5">Produtos compostos por múltiplos componentes</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/calculadora" className="btn-ghost text-xs">
+          <Link href="/precificacao-multicanal" className="btn-ghost text-xs">
             <Calculator size={13} /> Calcular preço
           </Link>
           <button onClick={openAdd} className="btn-primary">
@@ -366,7 +366,7 @@ export default function KitsPage() {
               )}
             </div>
             <p className="text-xs text-indigo-500 mt-2">
-              Na Calculadora, use o SKU <strong>{form.skuKit || 'do kit'}</strong> para ver os preços por canal com margem, frete, imposto e comissão.
+              No Multicanal RdB, use o SKU <strong>{form.skuKit || 'do kit'}</strong> para ver os preços por canal com margem, frete, imposto e comissão.
             </p>
           </div>
 
