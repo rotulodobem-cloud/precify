@@ -21,7 +21,7 @@ const prisma = new PrismaClient();
 
 // Todas as tabelas do schema.prisma
 const MODELS = [
-  'produto', 'variacao', 'plataforma', 'precificacao', 'compra', 'lote',
+  'produto', 'variacao', 'plataforma', 'compra', 'lote',
   'fornecedor', 'configuracao', 'kit', 'kitComponente',
   'faturamento', 'fornecedorAlias', 'pedidoCompra', 'pedidoItem',
   'calculoMulticanal',

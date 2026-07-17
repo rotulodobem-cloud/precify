@@ -48,8 +48,6 @@ model Variacao {
   status             String   @default("ativo")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-
-  precificacoes Precificacao[]
 }
 
 // ─── PLATAFORMAS ─────────────────────────────────────────────
@@ -68,37 +66,6 @@ model Plataforma {
   observacoes     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
-  precificacoes Precificacao[]
-}
-
-// ─── PRECIFICAÇÃO (legacy — mantido para compatibilidade) ────
-model Precificacao {
-  id               String     @id @default(cuid())
-  skuVariacao      String
-  variacao         Variacao   @relation(fields: [skuVariacao], references: [skuVariacao], onDelete: Cascade)
-  plataformaId     String
-  plataforma       Plataforma @relation(fields: [plataformaId], references: [id], onDelete: Cascade)
-  custoEmbalagem   Float      @default(0)
-  custoFrete       Float      @default(0)
-  custoColeta      Float      @default(0)
-  comissaoPct      Float
-  impostoPct       Float      @default(0.0829)
-  tipoFreteML      String     @default("full")
-  precoAtual       Float?
-  codigoAnuncio    String?
-  custoTotalCalc   Float?
-  lucroBruto       Float?
-  margemAtual      Float?
-  precoMinimo      Float?
-  precoIdeal       Float?
-  precoMaximo      Float?
-  precoPromocional Float?
-  statusMargem     String?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-
-  @@unique([skuVariacao, plataformaId])
 }
 
 // ─── COMPRAS ─────────────────────────────────────────────────

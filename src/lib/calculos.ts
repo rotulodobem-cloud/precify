@@ -4,22 +4,6 @@
 // ══════════════════════════════════════════════════════════════
 
 /**
- * Preço de venda a partir de custo e margens.
- *
- * Como comissão e imposto incidem sobre a RECEITA BRUTA (preço de venda),
- * precisamos isolar o preço:
- *
- *   precoVenda = custoTotal / (1 - comissao - imposto - margem)
- *
- * Planilha usa exatamente esta fórmula em todas as abas (ML, Shopee, TikTok, Magalu).
- */
-export function calcPrecoVenda(custoTotal: number, comissao: number, imposto: number, margem: number): number {
-  const divisor = 1 - comissao - imposto - margem
-  if (divisor <= 0) return 0
-  return round2(custoTotal / divisor)
-}
-
-/**
  * Custo de uma variação proporcional ao peso.
  *   custo_var = (custoPorKg × pesoGramas) / 1000
  *
@@ -34,21 +18,6 @@ export function calcCustoTotal(produto: number, embalagem: number, frete: number
   return round2(produto + embalagem + frete + coleta)
 }
 
-/** Preço mínimo para margem de 20% */
-export function calcPrecoMinimo(ct: number, comissao: number, imposto: number): number {
-  return calcPrecoVenda(ct, comissao, imposto, 0.20)
-}
-
-/** Preço ideal para margem de 25% */
-export function calcPrecoIdeal(ct: number, comissao: number, imposto: number): number {
-  return calcPrecoVenda(ct, comissao, imposto, 0.25)
-}
-
-/** Preço máximo para margem de 30% */
-export function calcPrecoMaximo(ct: number, comissao: number, imposto: number): number {
-  return calcPrecoVenda(ct, comissao, imposto, 0.30)
-}
-
 /**
  * Preço promocional = precoIdeal × 1,40
  *
@@ -59,12 +28,6 @@ export function calcPrecoPromocional(precoIdeal: number): number {
   return round2(precoIdeal * 1.40)
 }
 
-/** Margem bruta sobre receita bruta */
-export function calcMargem(precoVenda: number, custoTotal: number): number {
-  if (!precoVenda || precoVenda <= 0) return 0
-  return (precoVenda - custoTotal) / precoVenda
-}
-
 export type StatusMargem = 'SAUDAVEL' | 'ATENCAO' | 'PREJUIZO' | 'SEM_PRECO'
 
 export function statusMargem(margem?: number | null): StatusMargem {
@@ -72,88 +35,6 @@ export function statusMargem(margem?: number | null): StatusMargem {
   if (margem >= 0.25) return 'SAUDAVEL'
   if (margem >= 0.20) return 'ATENCAO'
   return 'PREJUIZO'
-}
-
-/** Calcula todos os campos de precificação de uma vez */
-export function calcPrecificacaoCompleta(p: {
-  custoProduto: number
-  custoEmbalagem: number
-  custoFrete: number
-  custoColeta: number
-  comissaoPct: number
-  impostoPct: number
-  precoAtual?: number | null
-}) {
-  const ct = calcCustoTotal(p.custoProduto, p.custoEmbalagem, p.custoFrete, p.custoColeta)
-  const pMin   = calcPrecoMinimo(ct, p.comissaoPct, p.impostoPct)
-  const pIdeal = calcPrecoIdeal(ct, p.comissaoPct, p.impostoPct)
-  const pMax   = calcPrecoMaximo(ct, p.comissaoPct, p.impostoPct)
-  const pPromo = calcPrecoPromocional(pIdeal)
-
-  let lucroBruto: number | null = null
-  let margemAtual: number | null = null
-  let status: StatusMargem = 'SEM_PRECO'
-
-  if (p.precoAtual && p.precoAtual > 0) {
-    lucroBruto = round2(p.precoAtual - ct)
-    margemAtual = calcMargem(p.precoAtual, ct)
-    status = statusMargem(margemAtual)
-  }
-
-  return {
-    custoTotalCalc: ct,
-    precoMinimo: pMin,
-    precoIdeal: pIdeal,
-    precoMaximo: pMax,
-    precoPromocional: pPromo,
-    lucroBruto,
-    margemAtual,
-    statusMargem: status,
-  }
-}
-
-/**
- * Versão que resolve o frete ML automaticamente pela tabela FULL
- * antes de calcular os preços.
- *
- * Para plataformas não-ML, usa o custoFrete passado diretamente.
- * Para ML:
- *   - tipoFreteML = 'full'   → busca na tabela FULL usando peso + precoAtual (ou precoIdeal estimado)
- *   - tipoFreteML = 'flex'   → tabela Flex/Envios pelo peso
- *   - tipoFreteML = 'fixo'   → usa o custoFrete passado sem alterar
- */
-export function calcPrecificacaoComFreteML(p: {
-  custoProduto: number
-  custoEmbalagem: number
-  custoFrete: number        // usado só se tipoFreteML = 'fixo' ou plataforma não-ML
-  custoColeta: number
-  comissaoPct: number
-  impostoPct: number
-  precoAtual?: number | null
-  isML: boolean
-  tipoFreteML?: string      // 'full' | 'flex' | 'fixo'
-  pesoGramas?: number | null
-}) {
-  // Importação dinâmica da tabela (evita circular dependency no browser)
-  let freteResolvido = p.custoFrete
-
-  if (p.isML && p.tipoFreteML !== 'fixo' && p.pesoGramas) {
-    const pesoKg = p.pesoGramas / 1000
-    if (p.tipoFreteML === 'flex' || p.tipoFreteML === 'envios') {
-      freteResolvido = calcFreteFlexMLInternal(pesoKg)
-    } else {
-      // full — para calcular o frete precisamos de um preço de referência.
-      // Usamos o precoAtual se existir, senão fazemos uma estimativa inicial
-      // sem frete para depois corrigir iterativamente.
-      const precoRef = p.precoAtual ?? estimarPrecoSemFrete(p.custoProduto, p.custoEmbalagem, p.custoColeta, p.comissaoPct, p.impostoPct)
-      freteResolvido = calcFreteFullML(pesoKg, precoRef)
-    }
-  }
-
-  return {
-    ...calcPrecificacaoCompleta({ ...p, custoFrete: freteResolvido }),
-    custoFrete: round2(freteResolvido),
-  }
 }
 
 // ── Tabela FULL inline (evita import circular no server) ─────
@@ -188,20 +69,6 @@ export function calcFreteFullML(pesoKg: number, precoVenda: number): number {
   const col = colIdx === -1 ? faixasPreco.length - 1 : colIdx
   const linha = tabela.find(([max]) => pesoKg <= max) ?? tabela[tabela.length - 1]
   return linha[1][col]
-}
-
-function calcFreteFlexMLInternal(pesoKg: number): number {
-  const tabela: [number, number][] = [
-    [0.3, 12], [0.5, 14], [1.0, 16], [2.0, 19],
-    [3.0, 22], [5.0, 27], [10.0, 35], [30.0, 55],
-  ]
-  return (tabela.find(([max]) => pesoKg <= max) ?? tabela[tabela.length - 1])[1]
-}
-
-function estimarPrecoSemFrete(custoProduto: number, embalagem: number, coleta: number, comissao: number, imposto: number): number {
-  // Estimativa inicial sem frete para ter um preço de referência
-  const ct = custoProduto + embalagem + coleta
-  return calcPrecoIdeal(ct, comissao, imposto)
 }
 
 export function round2(v: number): number {

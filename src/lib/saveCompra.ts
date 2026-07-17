@@ -1,10 +1,9 @@
 import db from '@/lib/db'
-import { calcCustoVariacao, calcPrecificacaoComFreteML, round2 } from '@/lib/calculos'
+import { calcCustoVariacao, round2 } from '@/lib/calculos'
 
 export async function recalcularVariacoesEPrecificacoes(skuPrincipal: string, custoUnit: number) {
   const variacoes = await db.variacao.findMany({
     where: { skuPrincipal },
-    include: { precificacoes: { include: { plataforma: true } } },
   })
 
   for (const v of variacoes) {
@@ -23,30 +22,6 @@ export async function recalcularVariacoesEPrecificacoes(skuPrincipal: string, cu
       where: { id: v.id },
       data: { custoCalculado: novoCustoCalc, custoTotal: novoCustoTotal },
     })
-
-    for (const prec of v.precificacoes) {
-      const isML = prec.plataforma.slug === 'ml'
-      const tipoFreteML = (prec as Record<string, unknown>).tipoFreteML as string ?? 'full'
-
-      const calc = calcPrecificacaoComFreteML({
-        custoProduto: novoCustoTotal ?? novoCustoCalc ?? 0,
-        custoEmbalagem: prec.custoEmbalagem, custoFrete: prec.custoFrete,
-        custoColeta: prec.custoColeta, comissaoPct: prec.comissaoPct,
-        impostoPct: prec.impostoPct, precoAtual: prec.precoAtual,
-        isML, tipoFreteML, pesoGramas: v.pesoGramas,
-      })
-
-      await db.precificacao.update({
-        where: { id: prec.id },
-        data: {
-          custoFrete: calc.custoFrete, custoTotalCalc: calc.custoTotalCalc,
-          precoMinimo: calc.precoMinimo, precoIdeal: calc.precoIdeal,
-          precoMaximo: calc.precoMaximo, precoPromocional: calc.precoPromocional,
-          lucroBruto: calc.lucroBruto, margemAtual: calc.margemAtual,
-          statusMargem: calc.statusMargem,
-        },
-      })
-    }
 
     await db.calculoMulticanal.updateMany({
       where: { skuVariacao: v.skuVariacao },

@@ -2,34 +2,6 @@ import { PrismaClient } from '@prisma/client'
 
 const db = new PrismaClient()
 
-// ── Motor de cálculo ────────────────────────────────────────────
-function calcPreco(custoTotal: number, comissao: number, imposto: number, margem: number): number {
-  const div = 1 - comissao - imposto - margem
-  return div > 0 ? Math.round((custoTotal / div) * 100) / 100 : 0
-}
-
-function calcPrecificacao(params: {
-  custoProduto: number; embalagem: number; frete: number; coleta: number
-  comissao: number; imposto: number; precoAtual?: number | null
-}) {
-  const { custoProduto, embalagem, frete, coleta, comissao, imposto, precoAtual } = params
-  const ct = custoProduto + embalagem + frete + coleta
-  const pMin  = calcPreco(ct, comissao, imposto, 0.20)
-  const pIdeal = calcPreco(ct, comissao, imposto, 0.25)
-  const pMax  = calcPreco(ct, comissao, imposto, 0.30)
-  const pPromo = Math.round(pIdeal * 1.45 * 100) / 100
-
-  let margAtual: number | null = null
-  let lucro: number | null = null
-  let status = 'SEM_PRECO'
-  if (precoAtual && precoAtual > 0) {
-    lucro = precoAtual - ct
-    margAtual = lucro / precoAtual
-    status = margAtual >= 0.25 ? 'SAUDAVEL' : margAtual >= 0.20 ? 'ATENCAO' : 'PREJUIZO'
-  }
-  return { custoTotalCalc: Math.round(ct*100)/100, precoMinimo: pMin, precoIdeal: pIdeal, precoMaximo: pMax, precoPromocional: pPromo, lucroBruto: lucro, margemAtual: margAtual, statusMargem: status }
-}
-
 async function main() {
   console.log('🌱 Criando banco de dados...')
 
@@ -101,10 +73,6 @@ async function main() {
     const custoPorKg = 'custoPorKg' in p && p.custoPorKg != null ? p.custoPorKg : null
     const custoUnitario = 'custoUnitario' in p ? p.custoUnitario as number : null
     const custoAtualizado = custoPorKg ?? custoUnitario ?? null
-    const comissaoML = 'comissaoML' in p ? (p as any).comissaoML : 0.14
-    const comissaoShopee = 'comissaoShopee' in p ? (p as any).comissaoShopee : 0.20
-    const margemML = 'margemML' in p ? (p as any).margemML : 0.25
-    const margemShopee = 'margemShopee' in p ? (p as any).margemShopee : 0.25
 
     await db.produto.upsert({
       where: { skuPrincipal: p.sku }, update: {},
@@ -132,20 +100,6 @@ async function main() {
           where: { skuVariacao: skuVar }, update: {},
           create: { skuVariacao: skuVar, skuPrincipal: p.sku, nomeVariacao: nome, pesoGramas: g, fatorConversao: fator, custoCalculado: custoCalc, custoAdicional: 0, custoTotal: custoVar, status: 'ativo' }
         })
-
-        // Precificação ML
-        const calcML = calcPrecificacao({ custoProduto: custoVar, embalagem: p.embalML, frete: p.freteML, coleta: 0, comissao: comissaoML, imposto: 0.08 })
-        await db.precificacao.upsert({
-          where: { skuVariacao_plataformaId: { skuVariacao: skuVar, plataformaId: ml.id } }, update: {},
-          create: { skuVariacao: skuVar, plataformaId: ml.id, custoEmbalagem: p.embalML, custoFrete: p.freteML, comissaoPct: comissaoML, impostoPct: 0.08, ...calcML }
-        })
-
-        // Precificação Shopee
-        const calcSh = calcPrecificacao({ custoProduto: custoVar, embalagem: p.embShopee, frete: p.freteShopee, coleta: 0, comissao: comissaoShopee, imposto: 0.08 })
-        await db.precificacao.upsert({
-          where: { skuVariacao_plataformaId: { skuVariacao: skuVar, plataformaId: shopee.id } }, update: {},
-          create: { skuVariacao: skuVar, plataformaId: shopee.id, custoEmbalagem: p.embShopee, custoFrete: p.freteShopee, comissaoPct: comissaoShopee, impostoPct: 0.08, ...calcSh }
-        })
       }
     } else if (custoUnitario || custoPorKg) {
       // Produto sem variações (kit, suplemento, etc.)
@@ -156,25 +110,12 @@ async function main() {
         where: { skuVariacao: skuVar }, update: {},
         create: { skuVariacao: skuVar, skuPrincipal: p.sku, nomeVariacao: p.nome, pesoGramas: null, fatorConversao: 1, custoCalculado: custo, custoAdicional: 0, custoTotal: custo, status: 'ativo' }
       })
-
-      const calcML = calcPrecificacao({ custoProduto: custo, embalagem: p.embalML, frete: p.freteML, coleta: 0, comissao: comissaoML, imposto: 0.08 })
-      await db.precificacao.upsert({
-        where: { skuVariacao_plataformaId: { skuVariacao: skuVar, plataformaId: ml.id } }, update: {},
-        create: { skuVariacao: skuVar, plataformaId: ml.id, custoEmbalagem: p.embalML, custoFrete: p.freteML, comissaoPct: comissaoML, impostoPct: 0.08, ...calcML }
-      })
-
-      const calcSh = calcPrecificacao({ custoProduto: custo, embalagem: p.embShopee, frete: p.freteShopee, coleta: 0, comissao: comissaoShopee, imposto: 0.08 })
-      await db.precificacao.upsert({
-        where: { skuVariacao_plataformaId: { skuVariacao: skuVar, plataformaId: shopee.id } }, update: {},
-        create: { skuVariacao: skuVar, plataformaId: shopee.id, custoEmbalagem: p.embShopee, custoFrete: p.freteShopee, comissaoPct: comissaoShopee, impostoPct: 0.08, ...calcSh }
-      })
     }
   }
 
   const totProd = await db.produto.count()
   const totVar  = await db.variacao.count()
-  const totPrec = await db.precificacao.count()
-  console.log(`✅ Seed concluído: ${totProd} produtos · ${totVar} variações · ${totPrec} precificações`)
+  console.log(`✅ Seed concluído: ${totProd} produtos · ${totVar} variações`)
 }
 
 main().catch(console.error).finally(() => db.$disconnect())
