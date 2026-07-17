@@ -49,8 +49,7 @@ export async function GET(req: NextRequest) {
   const skusComSinalPreciso = new Set<string>()
   const produtosPrecisos: ItemAjustar[] = []
   for (const calc of comPrecoPraticado) {
-    const ativos = (calc.canaisAtivos ?? {}) as Record<string, boolean>
-    if (!ativos.lp || !calc.precoPraticadoLP) continue
+    if (!calc.precoPraticadoLP) continue
     const canaisCfg = (calc.canais ?? {}) as Record<string, Record<string, number>>
     const cfgLp = canaisCfg.lp
     if (!cfgLp) continue
