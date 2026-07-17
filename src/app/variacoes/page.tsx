@@ -25,6 +25,8 @@ function VariacoesContent() {
   const [modal, setModal] = useState(false); const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState({ ...emptyV, skuPrincipal: skuFiltro })
   const [saving, setSaving] = useState(false); const [error, setError] = useState('')
+  const [produtoEncontrado, setProdutoEncontrado] = useState<string | null>(null)
+  const [buscandoProduto, setBuscandoProduto] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -36,10 +38,10 @@ function VariacoesContent() {
   }, [q, skuFiltro])
   useEffect(() => { load() }, [load])
 
-  const openAdd = () => { setForm({ ...emptyV, skuPrincipal: skuFiltro }); setEditing(null); setError(''); setModal(true) }
+  const openAdd = () => { setForm({ ...emptyV, skuPrincipal: skuFiltro }); setEditing(null); setError(''); setProdutoEncontrado(null); setModal(true) }
   const openEdit = (v: Variacao) => {
     setForm({ skuVariacao: v.skuVariacao, skuPrincipal: v.skuPrincipal, nomeVariacao: v.nomeVariacao, pesoGramas: String(v.pesoGramas ?? ''), custoAdicional: String(v.custoAdicional), embalagem: v.embalagem ?? '', status: v.status })
-    setEditing(v.id); setError(''); setModal(true)
+    setEditing(v.id); setError(''); setProdutoEncontrado(null); setModal(true)
   }
   const save = async () => {
     setSaving(true); setError('')
@@ -54,6 +56,21 @@ function VariacoesContent() {
     await fetch(`/api/variacoes/${id}`, { method: 'DELETE' }); load()
   }
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const buscarProdutoPorSku = async () => {
+    const sku = form.skuPrincipal.trim()
+    setProdutoEncontrado(null)
+    if (!sku) return
+    setBuscandoProduto(true)
+    const r = await fetch(`/api/produtos/${encodeURIComponent(sku)}`)
+    setBuscandoProduto(false)
+    if (!r.ok) { setProdutoEncontrado('__nao_encontrado__'); return }
+    const produto = await r.json()
+    setProdutoEncontrado(produto.nome)
+    if (!editing && !form.nomeVariacao.trim()) {
+      setForm(p => ({ ...p, nomeVariacao: produto.nome }))
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -124,7 +141,13 @@ function VariacoesContent() {
           {error && <Alert type="error">{error}</Alert>}
           <div className="grid grid-cols-2 gap-3">
             <div><label className="lbl">SKU variação *</label><input className="inp" value={form.skuVariacao} onChange={f('skuVariacao')} disabled={!!editing} placeholder="242-O250" /></div>
-            <div><label className="lbl">SKU principal *</label><input className="inp" value={form.skuPrincipal} onChange={f('skuPrincipal')} placeholder="242" /></div>
+            <div>
+              <label className="lbl">SKU principal *</label>
+              <input className="inp" value={form.skuPrincipal} onChange={f('skuPrincipal')} onBlur={buscarProdutoPorSku} placeholder="242" />
+              {buscandoProduto && <p className="text-xs text-gray-400 mt-1">Buscando produto…</p>}
+              {!buscandoProduto && produtoEncontrado === '__nao_encontrado__' && <p className="text-xs text-red-500 mt-1">Nenhum produto com esse SKU principal</p>}
+              {!buscandoProduto && produtoEncontrado && produtoEncontrado !== '__nao_encontrado__' && <p className="text-xs text-emerald-600 mt-1">Produto: {produtoEncontrado}</p>}
+            </div>
           </div>
           <div><label className="lbl">Nome da variação *</label><input className="inp" value={form.nomeVariacao} onChange={f('nomeVariacao')} placeholder="Psyllium 250g" /></div>
           <div className="grid grid-cols-2 gap-3">
