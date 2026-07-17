@@ -3,6 +3,7 @@ import db from '@/lib/db'
 import { CANAIS_MULTICANAL, calcularCanalModoPreco } from '@/lib/calculosMulticanal'
 
 const DIAS_PARADO = 60
+const TOLERANCIA_PADRAO = 10
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -26,6 +27,51 @@ export async function GET(req: NextRequest) {
     .map(([fornecedor, total]) => ({ fornecedor, total: Math.round(total * 100) / 100 }))
     .sort((a, b) => b.total - a.total)
 
+  const tolConfig = await db.configuracao.findUnique({ where: { chave: 'tolerancia_loja_propria_pct' } })
+  const tolerancia = tolConfig ? parseFloat(tolConfig.valor) : TOLERANCIA_PADRAO
+
+  type ItemAjustar = {
+    sku: string; skuVariacao: string | null; nome: string
+    direcao: 'subir' | 'baixar'; fonte: 'preco_praticado' | 'variacao_custo'
+    desvioPct: number | null; variacaoPct: number | null; dataCompra: string | null
+  }
+
+  const defLp = CANAIS_MULTICANAL.find(d => d.key === 'lp')!
+  const comPrecoPraticado = await db.calculoMulticanal.findMany({
+    where: { precoPraticadoLP: { not: null } },
+    select: {
+      sku: true, skuVariacao: true, nome: true, variacao: true,
+      custoProduto: true, pesoGramas: true, despesasVariaveisPct: true, despesasFixasPct: true,
+      canais: true, canaisAtivos: true, precoPraticadoLP: true,
+    },
+  })
+
+  const skusComSinalPreciso = new Set<string>()
+  const produtosPrecisos: ItemAjustar[] = []
+  for (const calc of comPrecoPraticado) {
+    const ativos = (calc.canaisAtivos ?? {}) as Record<string, boolean>
+    if (!ativos.lp || !calc.precoPraticadoLP) continue
+    const canaisCfg = (calc.canais ?? {}) as Record<string, Record<string, number>>
+    const cfgLp = canaisCfg.lp
+    if (!cfgLp) continue
+    const r = calcularCanalModoPreco({
+      custoProduto: calc.custoProduto, despVarPct: calc.despesasVariaveisPct, despFixPct: calc.despesasFixasPct,
+      pesoGramas: calc.pesoGramas, canal: cfgLp as any, def: defLp, shAuto: true,
+    })
+    if (!r) continue
+    if (calc.sku) skusComSinalPreciso.add(calc.sku)
+    const desvio = (r.preco - calc.precoPraticadoLP) / calc.precoPraticadoLP
+    if (Math.abs(desvio) * 100 <= tolerancia) continue
+    produtosPrecisos.push({
+      sku: calc.sku ?? '', skuVariacao: calc.skuVariacao ?? null,
+      nome: calc.variacao ? `${calc.nome} ${calc.variacao}` : calc.nome,
+      direcao: desvio > 0 ? 'subir' : 'baixar',
+      fonte: 'preco_praticado',
+      desvioPct: Math.round(Math.abs(desvio) * 10000) / 100,
+      variacaoPct: null, dataCompra: null,
+    })
+  }
+
   const comprasComVariacao = compras.filter(c => c.statusVariacao === 'AUMENTOU > 5%' || c.statusVariacao === 'DIMINUIU > 5%')
   const skusComVariacao = [...new Set(comprasComVariacao.map(c => c.skuPrincipal))]
   const calculosDosSkus = skusComVariacao.length
@@ -40,16 +86,20 @@ export async function GET(req: NextRequest) {
       .map(c => c.sku)
   )
   const nomesPorSku = new Map(calculosDosSkus.map(c => [c.sku, c.nome]))
-  const produtosPraAjustar = comprasComVariacao
-    .filter(c => skusComAnuncio.has(c.skuPrincipal))
+  const produtosAproximados: ItemAjustar[] = comprasComVariacao
+    .filter(c => skusComAnuncio.has(c.skuPrincipal) && !skusComSinalPreciso.has(c.skuPrincipal))
     .map(c => ({
-      sku: c.skuPrincipal,
+      sku: c.skuPrincipal, skuVariacao: null,
       nome: nomesPorSku.get(c.skuPrincipal) ?? c.nomeProduto,
-      direcao: c.statusVariacao === 'AUMENTOU > 5%' ? 'aumentou' : 'diminuiu',
+      direcao: (c.statusVariacao === 'AUMENTOU > 5%' ? 'subir' : 'baixar') as 'subir' | 'baixar',
+      fonte: 'variacao_custo' as const,
+      desvioPct: null,
       variacaoPct: c.variacaoPct != null ? Math.round(c.variacaoPct * 10000) / 100 : null,
-      dataCompra: c.dataCompra,
+      dataCompra: c.dataCompra.toISOString(),
     }))
     .filter((v, i, arr) => arr.findIndex(x => x.sku === v.sku) === i)
+
+  const produtosPraAjustar: ItemAjustar[] = [...produtosPrecisos, ...produtosAproximados]
 
   const produtos = await db.produto.findMany({ where: { status: 'ativo' }, select: { skuPrincipal: true, categoria: true } })
   const categoriaPorSku = new Map(produtos.map(p => [p.skuPrincipal, p.categoria]))
