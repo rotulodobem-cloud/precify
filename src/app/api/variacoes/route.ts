@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { calcCustoVariacao, round2 } from '@/lib/calculos'
+import { CANAIS_MULTICANAL, calcularCanalModoPreco } from '@/lib/calculosMulticanal'
+
+const ROTULOS: Record<string, string> = { lp: 'Loja Própria', mlFull: 'ML FULL', mlClassico: 'ML Clássico', sh: 'Shopee', tt: 'TikTok' }
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -15,11 +18,41 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       produto: { select: { nome: true, custoPorKg: true, custoUnitario: true, tipoPrecificacao: true, categoria: true } },
-      precificacoes: { include: { plataforma: true } },
     },
     orderBy: [{ skuPrincipal: 'asc' }, { pesoGramas: 'asc' }],
   })
-  return NextResponse.json(variacoes)
+
+  const skusVariacao = variacoes.map(v => v.skuVariacao)
+  const calculos = skusVariacao.length
+    ? await db.calculoMulticanal.findMany({
+        where: { skuVariacao: { in: skusVariacao } },
+        select: { skuVariacao: true, custoProduto: true, pesoGramas: true, despesasVariaveisPct: true, despesasFixasPct: true, canais: true, canaisAtivos: true },
+      })
+    : []
+  const porSku = new Map(calculos.filter(c => c.skuVariacao).map(c => [c.skuVariacao as string, c]))
+
+  const resposta = variacoes.map(v => {
+    const calc = porSku.get(v.skuVariacao)
+    const precosAnunciados: { canal: string; preco: number | null }[] = []
+    if (calc) {
+      const ativos = (calc.canaisAtivos ?? {}) as Record<string, boolean>
+      const canaisCfg = (calc.canais ?? {}) as Record<string, Record<string, number>>
+      for (const key of Object.keys(ativos)) {
+        if (!ativos[key]) continue
+        const def = CANAIS_MULTICANAL.find(d => d.key === key)
+        const cfg = canaisCfg[key]
+        if (!def || !cfg) continue
+        const r = calcularCanalModoPreco({
+          custoProduto: calc.custoProduto, despVarPct: calc.despesasVariaveisPct, despFixPct: calc.despesasFixasPct,
+          pesoGramas: calc.pesoGramas, canal: cfg as any, def, shAuto: true,
+        })
+        precosAnunciados.push({ canal: ROTULOS[key] ?? key, preco: r ? r.preco : null })
+      }
+    }
+    return { ...v, precosAnunciados }
+  })
+
+  return NextResponse.json(resposta)
 }
 
 export async function POST(req: NextRequest) {

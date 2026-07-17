@@ -11,7 +11,7 @@ interface Variacao {
   pesoGramas: number | null; fatorConversao: number | null; custoCalculado: number | null
   custoAdicional: number; custoTotal: number | null; embalagem: string | null; status: string
   produto: { nome: string; custoPorKg: number | null; tipoPrecificacao: string; categoria: string }
-  precificacoes: { id: string; precoIdeal: number | null; statusMargem: string | null; plataforma: { nome: string; slug: string; corHex: string } }[]
+  precosAnunciados: { canal: string; preco: number | null }[]
 }
 
 const emptyV = { skuVariacao: '', skuPrincipal: '', nomeVariacao: '', pesoGramas: '', custoAdicional: '0', embalagem: '', status: 'ativo' }
@@ -98,13 +98,12 @@ function VariacoesContent() {
                 <td className="td-r font-semibold">{brl(v.custoTotal)}</td>
                 <td className="td">
                   <div className="flex gap-1 flex-wrap">
-                    {v.precificacoes.map(p => (
-                      <span key={p.id} className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium"
-                        style={{ backgroundColor: p.plataforma.corHex + '20', color: p.plataforma.corHex }}>
-                        {p.plataforma.slug.toUpperCase()} {p.precoIdeal ? brl(p.precoIdeal) : '?'}
+                    {v.precosAnunciados.map((p, i) => (
+                      <span key={i} className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-indigo-50 text-indigo-700">
+                        {p.canal} {p.preco != null ? brl(p.preco) : '?'}
                       </span>
                     ))}
-                    {!v.precificacoes.length && <span className="text-xs text-gray-300">sem preço</span>}
+                    {!v.precosAnunciados.length && <span className="text-xs text-gray-300">sem anúncio</span>}
                   </div>
                 </td>
                 <td className="td text-center"><StatusBadge status={v.status} /></td>
