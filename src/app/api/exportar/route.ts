@@ -1,46 +1,53 @@
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import db from '@/lib/db'
+import { CANAIS_MULTICANAL, calcularCanalModoPreco } from '@/lib/calculosMulticanal'
+import { statusMargem } from '@/lib/calculos'
+
+const ROTULOS: Record<string, string> = { lp: 'Loja Própria', mlFull: 'Mercado Livre FULL', mlClassico: 'Mercado Livre Clássico', sh: 'Shopee', tt: 'TikTok Shop' }
 
 export async function GET() {
-  const precs = await db.precificacao.findMany({
-    include: {
-      variacao: { include: { produto: true } },
-      plataforma: true,
-    },
-    orderBy: [{ variacao: { skuPrincipal: 'asc' } }, { plataforma: { nome: 'asc' } }, { variacao: { pesoGramas: 'asc' } }],
+  const calculos = await db.calculoMulticanal.findMany({
+    where: { skuVariacao: { not: null } },
+    orderBy: [{ sku: 'asc' }, { variacao: 'asc' }],
   })
 
-  const rows = precs.map(p => ({
-    'SKU Variação':        p.skuVariacao,
-    'SKU Principal':       p.variacao.skuPrincipal,
-    'Produto':             p.variacao.produto.nome,
-    'Variação':            p.variacao.nomeVariacao,
-    'Peso (g)':            p.variacao.pesoGramas ?? '',
-    'Categoria':           p.variacao.produto.categoria,
-    'Plataforma':          p.plataforma.nome,
-    'Custo Produto R$':    p.variacao.custoTotal?.toFixed(2) ?? '',
-    'Embalagem R$':        p.custoEmbalagem.toFixed(2),
-    'Frete/Taxa R$':       p.custoFrete.toFixed(2),
-    'Custo Total R$':      p.custoTotalCalc?.toFixed(2) ?? '',
-    'Comissão %':          `${(p.comissaoPct * 100).toFixed(1)}%`,
-    'Imposto %':           `${(p.impostoPct * 100).toFixed(1)}%`,
-    'Preço Mínimo R$':     p.precoMinimo?.toFixed(2) ?? '',
-    'Preço Ideal R$':      p.precoIdeal?.toFixed(2) ?? '',
-    'Preço Máximo R$':     p.precoMaximo?.toFixed(2) ?? '',
-    'Preço Promoção R$':   p.precoPromocional?.toFixed(2) ?? '',
-    'Preço Atual R$':      p.precoAtual?.toFixed(2) ?? '',
-    'Lucro Bruto R$':      p.lucroBruto?.toFixed(2) ?? '',
-    'Margem Atual %':      p.margemAtual != null ? `${(p.margemAtual * 100).toFixed(1)}%` : '',
-    'Status Margem':       p.statusMargem ?? '',
-  }))
+  const rows: Record<string, unknown>[] = []
+  for (const calc of calculos) {
+    const ativos = (calc.canaisAtivos ?? {}) as Record<string, boolean>
+    const canaisCfg = (calc.canais ?? {}) as Record<string, Record<string, number>>
+    for (const key of Object.keys(ativos)) {
+      if (!ativos[key]) continue
+      const def = CANAIS_MULTICANAL.find(d => d.key === key)
+      const cfg = canaisCfg[key]
+      if (!def || !cfg) continue
+      const r = calcularCanalModoPreco({
+        custoProduto: calc.custoProduto, despVarPct: calc.despesasVariaveisPct, despFixPct: calc.despesasFixasPct,
+        pesoGramas: calc.pesoGramas, canal: cfg as any, def, shAuto: true,
+      })
+      rows.push({
+        'SKU Variação':      calc.skuVariacao,
+        'SKU Principal':     calc.sku ?? '',
+        'Produto':           calc.nome,
+        'Variação':          calc.variacao,
+        'Peso (g)':          calc.pesoGramas ?? '',
+        'Plataforma':        ROTULOS[key] ?? key,
+        'Custo Produto R$':  calc.custoProduto.toFixed(2),
+        'Embalagem R$':      cfg.emb != null ? cfg.emb.toFixed(2) : '',
+        'Comissão %':        cfg.com != null ? `${cfg.com.toFixed(1)}%` : '',
+        'Preço Ideal R$':    r ? r.preco.toFixed(2) : '',
+        'Preço Promoção R$': r ? (Math.round(r.preco * 1.4 * 100) / 100).toFixed(2) : '',
+        'Margem %':          r ? `${(r.margem * 100).toFixed(1)}%` : '',
+        'Status Margem':     r ? statusMargem(r.margem) : 'SEM_PRECO',
+      })
+    }
+  }
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(rows)
-  ws['!cols'] = Array(21).fill({}).map((_, i) => ({ wch: [12,12,28,22,8,14,14,14,10,10,12,10,10,12,12,12,14,12,12,12,14][i] ?? 12 }))
+  ws['!cols'] = [12,12,28,16,8,20,14,10,10,12,14,10,14].map(wch => ({ wch }))
   XLSX.utils.book_append_sheet(wb, ws, 'Precificação')
 
-  // Aba de compras
   const compras = await db.compra.findMany({ orderBy: { dataCompra: 'desc' }, take: 500 })
   const rowsC = compras.map(c => ({
     'Data':              new Date(c.dataCompra).toLocaleDateString('pt-BR'),
