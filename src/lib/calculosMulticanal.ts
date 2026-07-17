@@ -26,11 +26,11 @@ export const CANAIS_MULTICANAL: CanalDef[] = [
   { key: 'mlFull', nome: 'Mercado Livre', tag: 'FULL', cor: '#FFE600', corTexto: '#2D3277', freteEspecial: 'full',
     default: { emb: 0, com: 14, out: 0, fix: 0.60, frete: 0, margem: 20 } },
   { key: 'mlClassico', nome: 'Mercado Livre', tag: 'clássico', cor: '#FFE600', corTexto: '#2D3277',
-    default: { emb: 1.50, com: 14, out: 0, fix: 6.25, frete: 12, margem: 20 } },
+    default: { emb: 1.50, com: 14, out: 0, fix: 6.25, frete: 0, margem: 20 } },
   { key: 'sh', nome: 'Shopee', tag: 'faixa automática', cor: '#EE4D2D', corTexto: '#fff', autoBand: true,
-    default: { emb: 1.50, com: 20, out: 0, fix: 4, frete: 12, margem: 20 } },
+    default: { emb: 1.50, com: 20, out: 0, fix: 4, frete: 0, margem: 20 } },
   { key: 'tt', nome: 'TikTok Shop', tag: 'faixa automática', cor: '#111111', corTexto: '#fff', autoBand: true,
-    default: { emb: 1.50, com: 10, out: 6, fix: 4, frete: 12, margem: 20 } },
+    default: { emb: 1.50, com: 10, out: 6, fix: 4, frete: 0, margem: 20 } },
 ]
 
 export function shopeeBand(preco: number): { com: number; fix: number } {
