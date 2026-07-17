@@ -49,6 +49,21 @@ export default function PrecificacaoMulticanalPage() {
   const [salvando, setSalvando] = useState(false)
   const [msgSalvo, setMsgSalvo] = useState('')
 
+  // Preço praticado (Loja Própria) e tolerância
+  const [precoPraticadoLP, setPrecoPraticadoLP] = useState<number | null>(null)
+  const [tolerancia, setTolerancia] = useState(10)
+
+  useEffect(() => {
+    fetch('/api/configuracao/tolerancia-loja-propria').then(r => r.json()).then(d => setTolerancia(d.valor))
+  }, [])
+
+  const salvarTolerancia = async (novoValor: number) => {
+    setTolerancia(novoValor)
+    await fetch('/api/configuracao/tolerancia-loja-propria', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valor: novoValor }),
+    })
+  }
+
   const carregarBiblioteca = useCallback(async (filtro: string) => {
     const params = new URLSearchParams()
     if (filtro) params.set('q', filtro)
@@ -94,6 +109,7 @@ export default function PrecificacaoMulticanalPage() {
     setSku(''); setNome(''); setVariacaoTxt(''); setCustoProduto(0); setPesoGramas(null)
     setQ(''); setSugestoes([])
     setCanaisAtivos({})
+    setPrecoPraticadoLP(null)
   }
 
   const setCanalField = (key: string, field: keyof CanalConfig, valor: number) => {
@@ -116,7 +132,7 @@ export default function PrecificacaoMulticanalPage() {
       body: JSON.stringify({
         sku, nome, variacao: variacaoTxt, skuVariacao: skuVariacaoLigado,
         custoProduto, pesoGramas, despesasVariaveisPct: despVarPct, despesasFixasPct: despFixPct,
-        modo, precoTeste, canais, canaisAtivos,
+        modo, precoTeste, canais, canaisAtivos, precoPraticadoLP,
       }),
     })
     setSalvando(false)
@@ -135,6 +151,7 @@ export default function PrecificacaoMulticanalPage() {
     CANAIS_MULTICANAL.forEach(d => { canaisCompletos[d.key] = item.canais?.[d.key] ?? d.default })
     setCanais(canaisCompletos)
     setCanaisAtivos(item.canaisAtivos ?? {})
+    setPrecoPraticadoLP(item.precoPraticadoLP ?? null)
     setProdutoSel(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -165,6 +182,12 @@ export default function PrecificacaoMulticanalPage() {
       : calcularCanalModoAnalise({ custoProduto, despVarPct, despFixPct, pesoGramas, precoTeste, canal: canais[def.key], def, shAuto })
   })
 
+  const resultadoLP = resultados.lp
+  const desvioLP = (precoPraticadoLP && precoPraticadoLP > 0 && resultadoLP)
+    ? (resultadoLP.preco - precoPraticadoLP) / precoPraticadoLP
+    : null
+  const desvioLPForaTolerancia = desvioLP != null && Math.abs(desvioLP) * 100 > tolerancia
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -180,6 +203,10 @@ export default function PrecificacaoMulticanalPage() {
         .rdb-toggle { display: flex; gap: 6px; background: #fff; border: 1px solid #DDE7D4; border-radius: 14px; padding: 6px; margin: -20px auto 20px; max-width: 560px; box-shadow: 0 8px 24px rgba(4,43,20,.06); }
         .rdb-toggle button { flex: 1; border: none; background: transparent; padding: 12px 10px; border-radius: 9px; cursor: pointer; font-family: 'Poppins'; font-weight: 600; font-size: 13px; color: #5C6B60; }
         .rdb-toggle button.on { background: #055E2B; color: #fff; }
+        .rdb-tol { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: #5C6B60; margin: -8px auto 20px; }
+        .rdb-tol input { width: 56px; font-family: 'Poppins'; font-weight: 600; font-size: 13px; border: 1.5px solid #DDE7D4; border-radius: 8px; padding: 6px 8px; text-align: center; background: #fff; }
+        .rdb-lp-praticado { margin: 10px 14px 0; }
+        .rdb-lp-selo { display: inline-block; margin-top: 6px; }
         .rdb-card { background: #fff; border: 1px solid #DDE7D4; border-radius: 16px; box-shadow: 0 8px 24px rgba(4,43,20,.06); padding: 16px 20px; margin-bottom: 18px; }
         .rdb-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
         .rdb-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
@@ -231,12 +258,23 @@ export default function PrecificacaoMulticanalPage() {
             <div><small>Rótulo do Bem</small><strong>Central de Precificação</strong></div>
           </div>
           <h1>O preço ideal de venda em <span>cada canal</span></h1>
+          <a href="/precos-praticados" style={{ display: 'inline-block', marginTop: 10, fontSize: 11.5, color: '#CDDE35', textDecoration: 'underline' }}>
+            Importar preços praticados em massa (Loja Própria) →
+          </a>
         </div>
 
         <div className="rdb-main">
           <div className="rdb-toggle">
             <button className={modo === 'preco' ? 'on' : ''} onClick={() => setModo('preco')}>Descobrir o preço ideal</button>
             <button className={modo === 'margem' ? 'on' : ''} onClick={() => setModo('margem')}>Analisar um preço</button>
+          </div>
+
+          <div className="rdb-tol">
+            <span>Tolerância de preço (Loja Própria):</span>
+            <input type="number" step="1" min="0" value={tolerancia}
+              onChange={e => setTolerancia(parseFloat(e.target.value) || 0)}
+              onBlur={e => salvarTolerancia(parseFloat(e.target.value) || 0)} />
+            <span>%</span>
           </div>
 
           <section className="rdb-card">
@@ -320,6 +358,22 @@ export default function PrecificacaoMulticanalPage() {
                     {def.key !== 'lp' && !canaisAtivos[def.key] && <span className="rdb-selo" style={{ background: '#EEF2E9', color: '#5C6B60' }}>sem anúncio</span>}
                     {r && r.lucro < 0 && <span className="rdb-selo err">prejuízo</span>}
                   </div>
+
+                  {def.key === 'lp' && (
+                    <div className="rdb-lp-praticado">
+                      <div className="rdb-field">
+                        <label>Preço praticado hoje (R$)</label>
+                        <input type="number" step="0.01" value={precoPraticadoLP ?? ''}
+                          onChange={e => setPrecoPraticadoLP(e.target.value ? parseFloat(e.target.value) : null)}
+                          placeholder="ex: 24.90" />
+                      </div>
+                      {desvioLPForaTolerancia && (
+                        <span className="rdb-selo err rdb-lp-selo">
+                          preço calculado {desvioLP! > 0 ? 'subiu' : 'baixou'} {pctf(Math.abs(desvioLP!) * 100)} vs. praticado
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {def.key !== 'lp' && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#5C6B60', padding: '6px 14px 0' }}>
