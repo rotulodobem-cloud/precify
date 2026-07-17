@@ -11,7 +11,7 @@ type Etapa = 'upload' | 'validacao' | 'concluido'
 type Modo = 'planilha' | 'lista' | 'comparar'
 
 interface LinhaRaw { linha: number; data: string; nomeProduto: string; fornecedor: string; quantidade: number; valorTotal: number; skuInformado?: string }
-interface LinhaValidada extends LinhaRaw { status: 'confirmado' | 'sugestao' | 'novo' | 'sku_nao_encontrado'; skuSugerido: string | null; nomeCadastrado: string | null; custoPorKg: number | null; precoVenda: number | null; canalPreco: string | null; sugestoes: { skuPrincipal: string; nome: string }[]; skuFinal: string; isNovo: boolean }
+interface LinhaValidada extends LinhaRaw { status: 'confirmado' | 'sugestao' | 'novo' | 'sku_nao_encontrado'; skuSugerido: string | null; nomeCadastrado: string | null; custoPorKg: number | null; precoVenda: number | null; sugestoes: { skuPrincipal: string; nome: string }[]; skuFinal: string; isNovo: boolean }
 
 interface ProdutoLista extends ProdutoFornecedor {
   selecionado: boolean; skuInterno: string | null; nomeInterno: string | null; custoPorKgAtual: number | null; variacao: number | null

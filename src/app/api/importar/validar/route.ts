@@ -24,21 +24,13 @@ export async function POST(req: NextRequest) {
         select: { skuPrincipal: true, nome: true, custoPorKg: true },
       })
 
-      // Buscar último preço de venda conhecido
-      const ultimaPrecificacao = await db.precificacao.findFirst({
-        where: { variacao: { skuPrincipal: linha.skuInformado.trim() } },
-        orderBy: { updatedAt: 'desc' },
-        select: { precoAtual: true, plataforma: { select: { nome: true } } },
-      })
-
       resultado.push({
         ...linha,
         status: produto ? 'confirmado' : 'sku_nao_encontrado',
         skuSugerido: produto?.skuPrincipal ?? null,
         nomeCadastrado: produto?.nome ?? null,
         custoPorKg: produto?.custoPorKg ?? null,
-        precoVenda: ultimaPrecificacao?.precoAtual ?? null,
-        canalPreco: ultimaPrecificacao?.plataforma.nome ?? null,
+        precoVenda: null,
         sugestoes: [],
       })
       continue
@@ -62,18 +54,8 @@ export async function POST(req: NextRequest) {
       .slice(0, 4)
       .map(p => ({ skuPrincipal: p.skuPrincipal, nome: p.nome, custoPorKg: p.custoPorKg }))
 
-    // Buscar preço do mais provável
-    let precoVenda = null
-    let canalPreco = null
-    if (sugestoes.length > 0) {
-      const ultimaPrecificacao = await db.precificacao.findFirst({
-        where: { variacao: { skuPrincipal: sugestoes[0].skuPrincipal } },
-        orderBy: { updatedAt: 'desc' },
-        select: { precoAtual: true, plataforma: { select: { nome: true } } },
-      })
-      precoVenda = ultimaPrecificacao?.precoAtual ?? null
-      canalPreco = ultimaPrecificacao?.plataforma.nome ?? null
-    }
+    // Preço de venda: sem lookup automático — usuária preenche manualmente
+    const precoVenda = null
 
     resultado.push({
       ...linha,
@@ -82,7 +64,6 @@ export async function POST(req: NextRequest) {
       nomeCadastrado: sugestoes[0]?.nome ?? null,
       custoPorKg: sugestoes[0]?.custoPorKg ?? null,
       precoVenda,
-      canalPreco,
       sugestoes,
     })
   }
