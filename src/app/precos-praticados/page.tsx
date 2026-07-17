@@ -8,8 +8,8 @@ const brl = (v?: number | null) => v != null ? new Intl.NumberFormat('pt-BR', { 
 
 interface LinhaRaw { linha: number; codigo: string; preco: number }
 interface LinhaValidada extends LinhaRaw {
-  precoNovo: number; encontrado: boolean; calculoId: string | null
-  sku: string | null; nome: string | null; precoAntigo: number | null
+  precoNovo: number; encontrado: boolean; calculoId: string | null; skuVariacao: string | null
+  sku: string | null; nome: string | null; precoAntigo: number | null; novoRegistro: boolean
 }
 
 type Etapa = 'upload' | 'validacao' | 'concluido'
@@ -21,7 +21,7 @@ export default function PrecosPraticadosPage() {
   const [linhas, setLinhas] = useState<LinhaValidada[]>([])
   const [loading, setLoading] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
-  const [resultado, setResultado] = useState<{ atualizados: number; erros: string[] } | null>(null)
+  const [resultado, setResultado] = useState<{ atualizados: number; criados: number; erros: string[] } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const ref = useRef<HTMLInputElement>(null)
@@ -72,12 +72,12 @@ export default function PrecosPraticadosPage() {
   }
 
   const confirmar = async () => {
-    const encontrados = linhas.filter(l => l.encontrado && l.calculoId)
+    const encontrados = linhas.filter(l => l.encontrado)
     if (!encontrados.length) { setError('Nenhuma linha encontrada pra atualizar.'); return }
     setConfirmando(true); setError('')
     const r = await fetch('/api/precos-praticados/confirmar', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ linhas: encontrados.map(l => ({ calculoId: l.calculoId, precoNovo: l.precoNovo })) }),
+      body: JSON.stringify({ linhas: encontrados.map(l => ({ calculoId: l.calculoId, codigo: l.codigo, precoNovo: l.precoNovo })) }),
     })
     setResultado(await r.json())
     setEtapa('concluido')
@@ -112,7 +112,7 @@ export default function PrecosPraticadosPage() {
         <div className="space-y-4">
           <div className="card p-4 bg-blue-50 border-blue-100 text-sm text-blue-700">
             <p className="font-semibold">Colunas esperadas: <strong>Código (ou SKU)</strong> e <strong>Preço</strong></p>
-            <p className="mt-1">O código deve bater com o SKU de variação já cadastrado no Multicanal RdB (ex: 242-O1kg).</p>
+            <p className="mt-1">O código deve bater com o SKU de variação já cadastrado no sistema (ex: 242-O1kg). Se o produto ainda não tiver um cálculo no Multicanal RdB, um é criado automaticamente com os valores padrão.</p>
           </div>
           <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'}`}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
@@ -146,13 +146,18 @@ export default function PrecosPraticadosPage() {
             <div className="overflow-auto max-h-96">
               <table className="w-full text-sm">
                 <thead className="tbl-head sticky top-0">
-                  <tr><th className="th">Código</th><th className="th">Produto</th><th className="th-r">Preço antigo</th><th className="th-r">Preço novo</th></tr>
+                  <tr><th className="th">Código</th><th className="th">Produto</th><th className="th text-center">Situação</th><th className="th-r">Preço antigo</th><th className="th-r">Preço novo</th></tr>
                 </thead>
                 <tbody>
                   {encontrados.map((l, i) => (
                     <tr key={i} className="tr-row">
                       <td className="td font-mono text-xs">{l.codigo}</td>
                       <td className="td text-xs">{l.nome}</td>
+                      <td className="td text-center">
+                        {l.novoRegistro
+                          ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">novo cálculo</span>
+                          : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-50 text-gray-600 border border-gray-200">atualização</span>}
+                      </td>
                       <td className="td-r text-xs text-gray-400">{brl(l.precoAntigo)}</td>
                       <td className="td-r text-xs font-semibold">{brl(l.precoNovo)}</td>
                     </tr>
@@ -183,7 +188,7 @@ export default function PrecosPraticadosPage() {
           <div className="card p-6 text-center">
             <CheckCircle2 size={48} className="mx-auto text-emerald-500 mb-3" />
             <h2 className="text-xl font-bold mb-1">Preços atualizados!</h2>
-            <p className="text-sm text-gray-500 mt-2">{resultado.atualizados} produto(s) atualizado(s)</p>
+            <p className="text-sm text-gray-500 mt-2">{resultado.atualizados} produto(s) atualizado(s) · {resultado.criados} cálculo(s) novo(s) criado(s)</p>
             {resultado.erros.length > 0 && <p className="text-sm text-red-600 mt-2">{resultado.erros.length} erro(s) — confira os logs</p>}
           </div>
           <div className="flex gap-3">
