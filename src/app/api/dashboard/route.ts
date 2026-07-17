@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     select: {
       sku: true, skuVariacao: true, nome: true, variacao: true,
       custoProduto: true, pesoGramas: true, despesasVariaveisPct: true, despesasFixasPct: true,
-      canais: true, canaisAtivos: true, precoPraticadoLP: true,
+      canais: true, precoPraticadoLP: true,
     },
   })
 
