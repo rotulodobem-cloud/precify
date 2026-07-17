@@ -11,10 +11,7 @@ interface ProdResult {
   dataUltimaCompra: string | null; fornecedorPrincipal: string | null
   variacoes: {
     id: string; skuVariacao: string; nomeVariacao: string; pesoGramas: number | null; custoTotal: number | null
-    precificacoes: {
-      id: string; precoAtual: number | null; precoMinimo: number | null; precoIdeal: number | null; precoMaximo: number | null; precoPromocional: number | null; margemAtual: number | null; statusMargem: string | null; custoTotalCalc: number | null; comissaoPct: number; impostoPct: number
-      plataforma: { nome: string; slug: string; corHex: string }
-    }[]
+    canaisAnunciados: { canal: string; nome: string; cor: string; precoIdeal: number | null; precoPromocional: number | null; margem: number | null; statusMargem: string | null }[]
   }[]
   compras: { id: string; dataCompra: string; custoUnitario: number; fornecedor: string; statusVariacao: string | null }[]
 }
@@ -106,43 +103,29 @@ export default function BuscaPage() {
                 </div>
               </button>
 
-              {/* Preços por plataforma */}
+              {/* Canais anunciados */}
               {expanded.has(v.id) && (
                 <div className="bg-gray-50 px-4 pb-3">
-                  {v.precificacoes.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-3">Sem precificação cadastrada</p>
+                  {v.canaisAnunciados.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-3">Nenhum canal anunciado</p>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      {v.precificacoes.map(p => (
-                        <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-3">
+                      {v.canaisAnunciados.map(c => (
+                        <div key={c.canal} className="bg-white rounded-xl border border-gray-200 p-3">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.plataforma.corHex }} />
-                              <span className="text-xs font-bold text-gray-700">{p.plataforma.nome}</span>
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.cor }} />
+                              <span className="text-xs font-bold text-gray-700">{c.nome}</span>
                             </div>
-                            <StatusBadge status={p.statusMargem ?? 'SEM_PRECO'} />
+                            <StatusBadge status={c.statusMargem ?? 'SEM_PRECO'} />
                           </div>
-                          {/* Price grid */}
                           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                            {[
-                              ['Custo total', brl(p.custoTotalCalc), false],
-                              ['Preço atual', brl(p.precoAtual), !!p.precoAtual],
-                              ['Margem atual', pct(p.margemAtual), false],
-                              ['Comissão', pct(p.comissaoPct), false],
-                            ].map(([k, v, bold]) => (
-                              <div key={String(k)}>
-                                <p className="text-[10px] text-gray-400">{k}</p>
-                                <p className={`text-sm ${bold ? 'font-bold text-gray-900' : 'text-gray-700'}`}>{v}</p>
-                              </div>
-                            ))}
+                            <div><p className="text-[10px] text-gray-400">Margem</p><p className="text-sm text-gray-700">{pct(c.margem)}</p></div>
+                            <div><p className="text-[10px] text-gray-400">Preço ideal</p><p className="text-sm font-bold text-indigo-600">{brl(c.precoIdeal)}</p></div>
                           </div>
-                          <div className="mt-2.5 pt-2 border-t border-gray-100 grid grid-cols-3 gap-1 text-center">
-                            {[['Mínimo', p.precoMinimo, 'text-amber-600'], ['Ideal ★', p.precoIdeal, 'text-indigo-600'], ['Promoção', p.precoPromocional, 'text-purple-600']].map(([label, val, cls]) => (
-                              <div key={String(label)}>
-                                <p className="text-[10px] text-gray-400">{label}</p>
-                                <p className={`text-xs font-bold ${cls}`}>{brl(val as number | null)}</p>
-                              </div>
-                            ))}
+                          <div className="mt-2.5 pt-2 border-t border-gray-100 text-center">
+                            <p className="text-[10px] text-gray-400">Preço promocional</p>
+                            <p className="text-xs font-bold text-purple-600">{brl(c.precoPromocional)}</p>
                           </div>
                         </div>
                       ))}
