@@ -227,22 +227,24 @@ model PedidoItem {
 // a lado por SKU+Variação, o que o model Precificacao não permite
 // (lá só cabe 1 linha por SKU×Plataforma).
 model CalculoMulticanal {
-  id                   String   @id @default(cuid())
-  skuVariacao          String?
-  sku                  String?
-  nome                 String
-  variacao             String   @default("")
-  custoProduto         Float
-  pesoGramas           Float?
-  despesasVariaveisPct Float    @default(8)
-  despesasFixasPct     Float    @default(0)
-  modo                 String   @default("preco")
-  precoTeste           Float?
-  canais               Json
-  codigosAnuncio       Json?
-  canaisAtivos         Json?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                            String    @id @default(cuid())
+  skuVariacao                   String?
+  sku                           String?
+  nome                          String
+  variacao                      String    @default("")
+  custoProduto                  Float
+  pesoGramas                    Float?
+  despesasVariaveisPct          Float     @default(8)
+  despesasFixasPct              Float     @default(0)
+  modo                          String    @default("preco")
+  precoTeste                    Float?
+  canais                        Json
+  codigosAnuncio                Json?
+  canaisAtivos                  Json?
+  precoPraticadoLP              Float?
+  precoPraticadoLPAtualizadoEm  DateTime?
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
 
   @@unique([sku, variacao])
 }
