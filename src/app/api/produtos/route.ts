@@ -22,7 +22,6 @@ export async function GET(req: NextRequest) {
       include: {
         variacoes: {
           where: { status: 'ativo' },
-          include: { precificacoes: { include: { plataforma: true } } },
           orderBy: { pesoGramas: 'asc' },
         }
       },

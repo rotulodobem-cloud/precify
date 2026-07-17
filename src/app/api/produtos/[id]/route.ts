@@ -7,7 +7,6 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     where: { skuPrincipal: params.id },
     include: {
       variacoes: {
-        include: { precificacoes: { include: { plataforma: true } } },
         orderBy: { pesoGramas: 'asc' },
       },
       compras: { orderBy: { dataCompra: 'desc' }, take: 10 },
@@ -49,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  // Cascade vai apagar variacoes e precificacoes pelo schema
+  // Cascade vai apagar variacoes pelo schema
   await db.produto.delete({ where: { skuPrincipal: params.id } })
   return NextResponse.json({ ok: true })
 }
