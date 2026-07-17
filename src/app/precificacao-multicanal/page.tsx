@@ -97,11 +97,31 @@ export default function PrecificacaoMulticanalPage() {
     else { setCustoProduto(p.custoAtualizado ?? 0); setSkuVariacaoLigado(null); setPesoGramas(null); setVariacaoTxt('') }
   }
 
-  const selecionarVariacao = (v: VariacaoBusca) => {
+  const aplicarCalculoSalvo = (item: any) => {
+    setSku(item.sku); setNome(item.nome); setVariacaoTxt(item.variacao || '')
+    setSkuVariacaoLigado(item.skuVariacao); setCustoProduto(item.custoProduto); setPesoGramas(item.pesoGramas)
+    setDespVarPct(item.despesasVariaveisPct); setDespFixPct(item.despesasFixasPct)
+    setModo(item.modo === 'margem' ? 'margem' : 'preco'); setPrecoTeste(item.precoTeste || 0)
+    const canaisCompletos: CanaisState = {}
+    CANAIS_MULTICANAL.forEach(d => { canaisCompletos[d.key] = item.canais?.[d.key] ?? d.default })
+    setCanais(canaisCompletos)
+    setCanaisAtivos(item.canaisAtivos ?? {})
+    setPrecoPraticadoLP(item.precoPraticadoLP ?? null)
+  }
+
+  const selecionarVariacao = async (v: VariacaoBusca) => {
     setSkuVariacaoLigado(v.skuVariacao)
     setVariacaoTxt(v.nomeVariacao)
     setCustoProduto(v.custoTotal ?? v.custoCalculado ?? 0)
     setPesoGramas(v.pesoGramas)
+    setCanaisAtivos({})
+    setPrecoPraticadoLP(null)
+
+    const r = await fetch(`/api/calculo-multicanal?skuVariacao=${encodeURIComponent(v.skuVariacao)}`)
+    if (r.ok) {
+      const calculoSalvo = await r.json()
+      if (calculoSalvo) aplicarCalculoSalvo(calculoSalvo)
+    }
   }
 
   const limparProduto = () => {
@@ -143,15 +163,7 @@ export default function PrecificacaoMulticanalPage() {
   }
 
   const carregarDaLib = (item: any) => {
-    setSku(item.sku); setNome(item.nome); setVariacaoTxt(item.variacao || '')
-    setSkuVariacaoLigado(item.skuVariacao); setCustoProduto(item.custoProduto); setPesoGramas(item.pesoGramas)
-    setDespVarPct(item.despesasVariaveisPct); setDespFixPct(item.despesasFixasPct)
-    setModo(item.modo === 'margem' ? 'margem' : 'preco'); setPrecoTeste(item.precoTeste || 0)
-    const canaisCompletos: CanaisState = {}
-    CANAIS_MULTICANAL.forEach(d => { canaisCompletos[d.key] = item.canais?.[d.key] ?? d.default })
-    setCanais(canaisCompletos)
-    setCanaisAtivos(item.canaisAtivos ?? {})
-    setPrecoPraticadoLP(item.precoPraticadoLP ?? null)
+    aplicarCalculoSalvo(item)
     setProdutoSel(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
