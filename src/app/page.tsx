@@ -14,7 +14,7 @@ interface DashData {
   gastoTotal: number
   totalCompras: number
   fornecedores: { fornecedor: string; total: number }[]
-  produtosPraAjustar: { sku: string; nome: string; direcao: string; variacaoPct: number | null; dataCompra: string }[]
+  produtosPraAjustar: { sku: string; skuVariacao: string | null; nome: string; direcao: string; fonte: string; desvioPct: number | null; variacaoPct: number | null; dataCompra: string | null }[]
   porCategoria: { categoria: string; margemMedia: number; n: number }[]
   produtosParados: { skuPrincipal: string; nome: string; dataUltimaCompra: string | null }[]
 }
@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard title="Gasto com compras" value={brl(data?.gastoTotal)} sub={`${data?.totalCompras ?? 0} compras no mês`} icon={ShoppingCart} color="indigo" />
-        <StatCard title="Produtos pra ajustar preço" value={data?.produtosPraAjustar.length ?? '—'} sub="custo mudou e tem anúncio ativo" icon={AlertTriangle} color="amber" />
+        <StatCard title="Produtos pra ajustar preço" value={data?.produtosPraAjustar.length ?? '—'} sub="preço desatualizado ou custo mudou" icon={AlertTriangle} color="amber" />
         <StatCard title="Produtos parados" value={data?.produtosParados.length ?? '—'} sub="sem compra recente" icon={PackageX} color="blue" />
         <StatCard title="Fornecedor principal" value={data?.fornecedores[0]?.fornecedor ?? '—'} sub={data?.fornecedores[0] ? brl(data.fornecedores[0].total) : ''} icon={Building2} color="emerald" />
       </div>
@@ -100,24 +100,28 @@ export default function DashboardPage() {
           <div className="overflow-auto max-h-80">
             <table className="w-full">
               <thead className="tbl-head sticky top-0">
-                <tr><th className="th">Produto</th><th className="th text-center">Custo</th><th className="th-r">Variação</th><th className="th-r">Data</th></tr>
+                <tr><th className="th">Produto</th><th className="th text-center">Ação</th><th className="th-r">Desvio</th><th className="th-r">Origem</th></tr>
               </thead>
               <tbody>
                 {loading && <tr><td colSpan={4} className="py-8 text-center text-gray-400 text-sm"><Spinner size={16} className="inline" /></td></tr>}
                 {!loading && !data?.produtosPraAjustar.length && <tr><td colSpan={4} className="py-8 text-center text-gray-400 text-sm">Nenhum produto sinalizado 🎉</td></tr>}
                 {data?.produtosPraAjustar.map((p, i) => (
-                  <tr key={i} className="tr-row">
+                  <tr key={p.skuVariacao ?? `${p.sku}-${i}`} className="tr-row">
                     <td className="td">
                       <div className="font-medium text-gray-800 text-xs truncate max-w-[160px]">{p.nome}</div>
                       <div className="text-[10px] text-gray-400 font-mono">{p.sku}</div>
                     </td>
                     <td className="td text-center">
-                      {p.direcao === 'aumentou'
-                        ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><TrendingUp size={12} /> subiu</span>
-                        : <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><TrendingDown size={12} /> caiu</span>}
+                      {p.direcao === 'subir'
+                        ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><TrendingUp size={12} /> subir</span>
+                        : <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><TrendingDown size={12} /> baixar</span>}
                     </td>
-                    <td className="td-r text-xs font-semibold">{p.variacaoPct != null ? pct(Math.abs(p.variacaoPct)) : '—'}</td>
-                    <td className="td-r text-xs text-gray-400">{fmtData(p.dataCompra)}</td>
+                    <td className="td-r text-xs font-semibold">
+                      {p.fonte === 'preco_praticado' ? pct(p.desvioPct) : pct(p.variacaoPct != null ? Math.abs(p.variacaoPct) : null)}
+                    </td>
+                    <td className="td-r text-xs text-gray-400">
+                      {p.fonte === 'preco_praticado' ? 'preço desatualizado' : fmtData(p.dataCompra)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
