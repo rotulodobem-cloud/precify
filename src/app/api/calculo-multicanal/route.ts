@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
   const sku = String(b.sku ?? '').trim()
   const variacao = String(b.variacao ?? '').trim()
 
+  const precoPraticadoLP = b.precoPraticadoLP != null && b.precoPraticadoLP !== ''
+    ? parseFloat(b.precoPraticadoLP) : null
+
   const data = {
     sku: sku || null,
     nome: String(b.nome ?? '').trim(),
@@ -39,6 +42,8 @@ export async function POST(req: NextRequest) {
     precoTeste: b.precoTeste != null ? parseFloat(b.precoTeste) : null,
     canais: b.canais ?? {},
     canaisAtivos: b.canaisAtivos ?? {},
+    precoPraticadoLP,
+    precoPraticadoLPAtualizadoEm: precoPraticadoLP != null ? new Date() : null,
   }
 
   // Sem SKU não há chave estável pra upsert — cada salvamento vira um registro
