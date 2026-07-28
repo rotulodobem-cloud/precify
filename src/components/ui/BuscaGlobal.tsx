@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Search, Package, Tag, Calculator, ShoppingCart, Clock, CornerDownLeft } from 'lucide-react'
 import { Spinner } from '@/components/ui'
 import { useDebounce } from '@/lib/useDebounce'
+import type { Role } from '@/lib/auth'
 
 const brl = (v?: number | null) => v != null ? `R$ ${v.toFixed(2).replace('.', ',')}` : '—'
 
@@ -37,7 +38,7 @@ function lerRecentes(): Recente[] {
 }
 
 /** Busca global por SKU ou nome, disponível em qualquer tela por Ctrl+K. */
-export default function BuscaGlobal() {
+export default function BuscaGlobal({ role }: { role: Role | null }) {
   const router = useRouter()
   const path = usePathname()
   const [aberto, setAberto] = useState(false)
@@ -51,7 +52,8 @@ export default function BuscaGlobal() {
   const reqRef = useRef(0)
   const qBusca = useDebounce(q, 300)
 
-  const escondido = path === '/parceiro' || path === '/login'
+  // Só quem é admin busca: o parceiro não tem acesso a /api/busca.
+  const escondido = role !== 'admin'
 
   // Abre com Ctrl+K / ⌘K de qualquer lugar, ou pelo botão da sidebar
   useEffect(() => {

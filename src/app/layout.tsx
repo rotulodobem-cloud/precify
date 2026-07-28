@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { Poppins, Montserrat } from 'next/font/google'
+import { cookies } from 'next/headers'
 import './globals.css'
 import Sidebar from '@/components/ui/Sidebar'
 import BuscaGlobal from '@/components/ui/BuscaGlobal'
+import { roleFromCookie } from '@/lib/auth'
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -24,14 +26,18 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // O menu depende de quem está logado, não da página aberta: assim a dona da
+  // loja continua com o menu inteiro ao visitar a tela do parceiro.
+  const role = roleFromCookie(cookies().get('precify_auth')?.value)
+
   return (
     <html lang="pt-BR" className={`${poppins.variable} ${montserrat.variable}`}>
       <body className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar role={role} />
         <main className="flex-1 min-w-0 p-6 overflow-auto">
           {children}
         </main>
-        <BuscaGlobal />
+        <BuscaGlobal role={role} />
       </body>
     </html>
   )

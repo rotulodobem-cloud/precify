@@ -4,9 +4,10 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
-  Zap, Truck, Settings, Leaf, LogOut, Percent
+  Zap, Truck, Settings, Leaf, LogOut, Percent, Handshake
 } from 'lucide-react'
 import { EVENTO_ABRIR_BUSCA } from '@/components/ui/BuscaGlobal'
+import type { Role } from '@/lib/auth'
 
 const links = [
   { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
@@ -24,13 +25,16 @@ const links = [
   { href: '/compras',        label: 'Compras',         icon: ShoppingCart },
   { href: '/lotes',          label: 'Lotes',           icon: Tag },
   { href: '/importar',       label: 'Importar XLSX',   icon: Upload },
+  { href: '/parceiro',       label: 'Tela do parceiro', icon: Handshake },
   { href: '/configuracoes',  label: 'Configurações',   icon: Settings },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ role }: { role: Role | null }) {
   const path = usePathname()
 
-  if (path === '/parceiro') {
+  // Menu reduzido é do parceiro, não da página: quem é admin mantém o menu
+  // inteiro mesmo visitando /parceiro.
+  if (role === 'partner') {
     return (
       <aside className="w-56 shrink-0 bg-rdb-800 min-h-screen flex flex-col">
         <div className="px-4 py-5 border-b border-rdb-700/60">
