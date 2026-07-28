@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Pencil, Trash2, Search, RefreshCw } from 'lucide-react'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
+import { useDebounce } from '@/lib/useDebounce'
 
 const brl = (v?: number | null) => v != null ? `R$ ${v.toFixed(2).replace('.', ',')}` : '—'
 
@@ -21,6 +22,7 @@ function VariacoesContent() {
   const [vars, setVars] = useState<Variacao[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState(sp.get('q') ?? '')
+  const qBusca = useDebounce(q)
   const [skuFiltro] = useState(sp.get('skuPrincipal') ?? '')
   const [modal, setModal] = useState(false); const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState({ ...emptyV, skuPrincipal: skuFiltro })
@@ -31,11 +33,11 @@ function VariacoesContent() {
   const load = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (q) params.set('q', q)
+    if (qBusca) params.set('q', qBusca)
     if (skuFiltro) params.set('skuPrincipal', skuFiltro)
     const r = await fetch('/api/variacoes?' + params)
     setVars(await r.json()); setLoading(false)
-  }, [q, skuFiltro])
+  }, [qBusca, skuFiltro])
   useEffect(() => { load() }, [load])
 
   const openAdd = () => { setForm({ ...emptyV, skuPrincipal: skuFiltro }); setEditing(null); setError(''); setProdutoEncontrado(null); setModal(true) }
@@ -76,7 +78,7 @@ function VariacoesContent() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="page-title">Variações {skuFiltro && <span className="text-indigo-600">— {skuFiltro}</span>}</h1>
+          <h1 className="page-title">Variações {skuFiltro && <span className="text-rdb-700">— {skuFiltro}</span>}</h1>
           <p className="text-sm text-gray-500 mt-0.5">SKUs de variação por peso ou unidade</p>
         </div>
         <button onClick={openAdd} className="btn-primary"><Plus size={14} /> Nova variação</button>
@@ -103,7 +105,7 @@ function VariacoesContent() {
             {!loading && !vars.length && <Empty msg="Nenhuma variação encontrada" />}
             {vars.map(v => (
               <tr key={v.id} className="tr-row">
-                <td className="td font-mono text-xs font-bold text-indigo-600">{v.skuVariacao}</td>
+                <td className="td font-mono text-xs font-bold text-rdb-700">{v.skuVariacao}</td>
                 <td className="td text-xs">
                   <div className="font-medium text-gray-800">{v.produto.nome}</div>
                   <div className="text-gray-400 font-mono">{v.skuPrincipal}</div>
@@ -116,7 +118,7 @@ function VariacoesContent() {
                 <td className="td">
                   <div className="flex gap-1 flex-wrap">
                     {v.precosAnunciados.map((p, i) => (
-                      <span key={i} className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-indigo-50 text-indigo-700">
+                      <span key={i} className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-rdb-50 text-rdb-800">
                         {p.canal} {p.preco != null ? brl(p.preco) : '?'}
                       </span>
                     ))}
@@ -126,7 +128,7 @@ function VariacoesContent() {
                 <td className="td text-center"><StatusBadge status={v.status} /></td>
                 <td className="td">
                   <div className="flex gap-1.5 justify-end">
-                    <button onClick={() => openEdit(v)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={13} /></button>
+                    <button onClick={() => openEdit(v)} className="text-gray-300 hover:text-rdb-700 transition-colors"><Pencil size={13} /></button>
                     <button onClick={() => del(v.id, v.skuVariacao)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>

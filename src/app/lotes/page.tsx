@@ -1,7 +1,9 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Search, RefreshCw, Tag, Printer } from 'lucide-react'
 import { Loading, Empty } from '@/components/ui'
+import { useDebounce } from '@/lib/useDebounce'
 import Link from 'next/link'
 
 const dt = (d: string) => new Date(d).toLocaleDateString('pt-BR')
@@ -20,19 +22,21 @@ function statusValidade(dataValidade: string): 'vencido' | 'vencendo' | 'ok' {
   return 'ok'
 }
 
-export default function LotesPage() {
+function LotesContent() {
+  const sp = useSearchParams()
   const [lotes, setLotes] = useState<LoteItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(sp.get('q') ?? '')
+  const qBusca = useDebounce(q)
 
   const load = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (q) params.set('q', q)
+    if (qBusca) params.set('q', qBusca)
     const r = await fetch('/api/lotes?' + params)
     setLotes(await r.json())
     setLoading(false)
-  }, [q])
+  }, [qBusca])
 
   useEffect(() => { load() }, [load])
 
@@ -42,7 +46,7 @@ export default function LotesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="page-title flex items-center gap-2"><Tag size={20} className="text-indigo-500" /> Lotes</h1>
+          <h1 className="page-title flex items-center gap-2"><Tag size={20} className="text-rdb-600" /> Lotes</h1>
           <p className="text-sm text-gray-500 mt-0.5">Rastreabilidade de lote e validade para vigilância sanitária</p>
         </div>
       </div>
@@ -51,7 +55,7 @@ export default function LotesPage() {
         <div className="flex items-center gap-1.5 flex-1 min-w-40 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
           <Search size={13} className="text-gray-400" />
           <input className="flex-1 text-sm outline-none bg-transparent placeholder:text-gray-400"
-            placeholder="Buscar por número do lote…" value={q} onChange={e => setQ(e.target.value)} />
+            placeholder="Buscar por lote, nome do produto ou SKU…" value={q} onChange={e => setQ(e.target.value)} />
         </div>
         <button onClick={load} className="btn-icon btn-ghost"><RefreshCw size={13} /></button>
       </div>
@@ -71,7 +75,7 @@ export default function LotesPage() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {loading && <Loading />}
-            {!loading && !lotes.length && <Empty msg="Nenhum lote lançado ainda" />}
+            {!loading && !lotes.length && <Empty msg={qBusca ? `Nenhum lote encontrado para “${qBusca}”` : 'Nenhum lote lançado ainda'} />}
             {lotes.map(l => {
               const status = statusValidade(l.dataValidade)
               return (
@@ -95,7 +99,7 @@ export default function LotesPage() {
                     {dt(l.compra.dataCompra)} {(l.compra.numeroNF || l.compra.numeroPedido) && `· NF ${l.compra.numeroNF || l.compra.numeroPedido}`}
                   </td>
                   <td className="td">
-                    <Link href={`/lotes/${l.id}/etiqueta`} target="_blank" className="text-gray-300 hover:text-indigo-600 transition-colors">
+                    <Link href={`/lotes/${l.id}/etiqueta`} target="_blank" className="text-gray-300 hover:text-rdb-700 transition-colors">
                       <Printer size={14} />
                     </Link>
                   </td>
@@ -106,5 +110,13 @@ export default function LotesPage() {
         </table>
       </div>
     </div>
+  )
+}
+
+export default function LotesPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-400 py-8">Carregando…</div>}>
+      <LotesContent />
+    </Suspense>
   )
 }

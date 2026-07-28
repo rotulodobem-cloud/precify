@@ -1,8 +1,10 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet, Pencil, Tag } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
+import { useDebounce } from '@/lib/useDebounce'
 
 // ── Formatadores ─────────────────────────────────────────────
 const brl = (v?: number | null) =>
@@ -82,15 +84,17 @@ interface SugestaoForn {
   qtd30dias: number; ultimaQtd: number; sugestaoQtd: number
 }
 
-export default function ComprasPage() {
-  const [aba, setAba]             = useState<Aba>('dashboard')
+function ComprasContent() {
+  const sp = useSearchParams()
+  const [aba, setAba]             = useState<Aba>((sp.get('aba') as Aba) || 'dashboard')
   const [compras, setCompras]     = useState<Compra[]>([])
   const [dash, setDash]           = useState<DashCompras | null>(null)
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   const [loading, setLoading]     = useState(true)
 
   // Filtros histórico
-  const [q, setQ]                 = useState('')
+  const [q, setQ]                 = useState(sp.get('q') ?? '')
+  const qBusca                    = useDebounce(q)
   const [fornFiltro, setFornFiltro] = useState('')
   const [dataInicio, setDataInicio] = useState('')
   const [dataFim, setDataFim]     = useState('')
@@ -149,7 +153,7 @@ export default function ComprasPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (q) params.set('q', q)
+    if (qBusca) params.set('q', qBusca)
     if (fornFiltro) params.set('fornecedor', fornFiltro)
     if (dataInicio) params.set('dataInicio', dataInicio)
     if (dataFim) params.set('dataFim', dataFim)
@@ -159,7 +163,7 @@ export default function ComprasPage() {
       fetch('/api/compras/dashboard').then(r => r.json()),
     ])
     setCompras(comp); setDash(d); setLoading(false)
-  }, [q, fornFiltro, dataInicio, dataFim])
+  }, [qBusca, fornFiltro, dataInicio, dataFim])
 
   useEffect(() => { load(); loadFornecedores() }, [load, loadFornecedores])
 
@@ -499,7 +503,7 @@ export default function ComprasPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              ['Gasto total', brl(dash?.totalGasto), 'text-indigo-600'],
+              ['Gasto total', brl(dash?.totalGasto), 'text-rdb-700'],
               ['Total de compras', String(dash?.totalCompras ?? '—'), 'text-emerald-600'],
               ['Fornecedores ativos', String(dash?.fornecedoresAtivos ?? '—'), 'text-amber-600'],
               ['Margem média', pct(dash?.mediaMargemComPreco), 'text-blue-600'],
@@ -535,7 +539,7 @@ export default function ComprasPage() {
                   <div key={fn.fornecedor} className="flex items-center gap-3">
                     <span className="text-xs text-gray-700 w-36 truncate">{fn.fornecedor}</span>
                     <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div className="h-2 rounded-full bg-indigo-500 transition-all" style={{ width: `${pctTotal}%` }} />
+                      <div className="h-2 rounded-full bg-rdb-600 transition-all" style={{ width: `${pctTotal}%` }} />
                     </div>
                     <span className="text-xs font-semibold text-gray-700 w-28 text-right tabular-nums">{brl(fn.total)}</span>
                     <span className="text-xs text-gray-400 w-14 text-right">{fn.qtdCompras}x</span>
@@ -558,7 +562,7 @@ export default function ComprasPage() {
                 <tbody className="divide-y divide-gray-50">
                   {dash!.prejudizo.slice(0, 10).map(p => (
                     <tr key={p.sku} className="tr-row">
-                      <td className="td font-mono text-xs text-indigo-600">{p.sku}</td>
+                      <td className="td font-mono text-xs text-rdb-700">{p.sku}</td>
                       <td className="td text-xs">{p.produto}</td>
                       <td className="td-r text-xs">{brl(p.custoUnit)}</td>
                       <td className="td-r text-xs">{brl(p.precoVenda)}</td>
@@ -596,7 +600,7 @@ export default function ComprasPage() {
               <span className="text-xs text-gray-400">até</span>
               <input type="date" className="inp-sm w-auto" value={dataFim} onChange={e => setDataFim(e.target.value)} />
               {(dataInicio || dataFim || fornFiltro || q) && (
-                <button onClick={limparFiltros} className="text-xs text-indigo-600 hover:underline">Limpar filtros</button>
+                <button onClick={limparFiltros} className="text-xs text-rdb-700 hover:underline">Limpar filtros</button>
               )}
               <span className="text-xs text-gray-400 ml-auto">{compras.length} registros</span>
             </div>
@@ -617,7 +621,7 @@ export default function ComprasPage() {
                   <tr key={c.id} className={`tr-row ${c.statusVariacao === 'AUMENTOU > 5%' ? 'bg-red-50/40' : ''}`}>
                     <td className="td text-xs text-gray-500">{dt(c.dataCompra)}</td>
                     <td className="td">
-                      <div className="font-mono text-xs font-bold text-indigo-600">{c.skuPrincipal}</div>
+                      <div className="font-mono text-xs font-bold text-rdb-700">{c.skuPrincipal}</div>
                       <div className="text-xs text-gray-700">{c.nomeProduto}</div>
                     </td>
                     <td className="td text-xs">{c.fornecedor}</td>
@@ -638,7 +642,7 @@ export default function ComprasPage() {
                     </td>
                     <td className="td text-center"><StatusBadge status={c.statusFinanceiro} /></td>
                     <td className="td flex items-center gap-2">
-                      <button onClick={() => openEditCompra(c)} className="text-gray-300 hover:text-indigo-600 transition-colors">
+                      <button onClick={() => openEditCompra(c)} className="text-gray-300 hover:text-rdb-700 transition-colors">
                         <Pencil size={13} />
                       </button>
                       <button onClick={() => openLote(c)} className="text-gray-300 hover:text-emerald-600 transition-colors" title="Lançar lote">
@@ -662,7 +666,7 @@ export default function ComprasPage() {
             return (
               <div key={fn.fornecedor} className="card p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center font-bold text-indigo-600 text-sm">
+                  <div className="w-9 h-9 rounded-xl bg-rdb-50 flex items-center justify-center font-bold text-rdb-700 text-sm">
                     {fn.fornecedor.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -714,7 +718,7 @@ export default function ComprasPage() {
               {(dash?.ranking20 ?? []).filter(r => !buscaRanking || r.sku.toLowerCase().includes(buscaRanking.toLowerCase()) || r.produto.toLowerCase().includes(buscaRanking.toLowerCase())).map((r, i) => (
                 <tr key={r.sku + i} className={`tr-row ${r.status === 'AUMENTOU > 5%' ? 'bg-red-50/40' : r.status === 'DIMINUIU > 5%' ? 'bg-emerald-50/40' : ''}`}>
                   <td className="td text-xs text-gray-400">{i + 1}</td>
-                  <td className="td font-mono text-xs font-bold text-indigo-600">{r.sku}</td>
+                  <td className="td font-mono text-xs font-bold text-rdb-700">{r.sku}</td>
                   <td className="td text-sm font-medium">{r.produto}</td>
                   <td className="td-r text-xs text-gray-500">{num(r.custoAnt)}</td>
                   <td className="td-r font-semibold">{num(r.custoAtual)}</td>
@@ -749,7 +753,7 @@ export default function ComprasPage() {
                   const maxVol = Math.max(...Object.values(v.meses), 1)
                   return (
                     <tr key={v.sku} className="tr-row">
-                      <td className="td font-mono text-xs font-bold text-indigo-600">{v.sku}</td>
+                      <td className="td font-mono text-xs font-bold text-rdb-700">{v.sku}</td>
                       <td className="td text-sm">{v.produto}</td>
                       <td className="td-r font-semibold">{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(v.mediaMensal)}</td>
                       <td className="td-r text-xs text-gray-500">{v.totalMeses}</td>
@@ -757,7 +761,7 @@ export default function ComprasPage() {
                         <div className="flex items-end gap-0.5 h-8">
                           {meses.map(([mes, vol]) => (
                             <div key={mes} title={`${mes}: ${vol}`}
-                              className="bg-indigo-400 rounded-sm flex-1 min-w-[6px]"
+                              className="bg-rdb-400 rounded-sm flex-1 min-w-[6px]"
                               style={{ height: `${Math.max(15, (vol / maxVol) * 100)}%` }} />
                           ))}
                         </div>
@@ -793,7 +797,7 @@ export default function ComprasPage() {
                 {!loading && !dash?.melhorPreco.length && <Empty msg="Nenhum produto com múltiplos fornecedores" />}
                 {(dash?.melhorPreco ?? []).filter(m => !buscaMelhor || m.sku.toLowerCase().includes(buscaMelhor.toLowerCase()) || m.produto.toLowerCase().includes(buscaMelhor.toLowerCase())).map(m => (
                   <tr key={m.sku} className="tr-row">
-                    <td className="td font-mono text-xs font-bold text-indigo-600">{m.sku}</td>
+                    <td className="td font-mono text-xs font-bold text-rdb-700">{m.sku}</td>
                     <td className="td text-sm font-medium">{m.produto}</td>
                     <td className="td">
                       <div className="flex flex-col gap-1">
@@ -1419,8 +1423,8 @@ export default function ComprasPage() {
                   </div>
 
                   {lookup && (
-                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5 text-xs text-indigo-700">
-                      ✓ {lookup.nome} {lookup.custo && <span className="text-indigo-500">· último custo: {num(lookup.custo)}</span>}
+                    <div className="bg-rdb-50 border border-rdb-200 rounded-lg px-3 py-1.5 text-xs text-rdb-800">
+                      ✓ {lookup.nome} {lookup.custo && <span className="text-rdb-600">· último custo: {num(lookup.custo)}</span>}
                     </div>
                   )}
 
@@ -1441,7 +1445,7 @@ export default function ComprasPage() {
                     </div>
                   </div>
                   {item.quantidade && item.custoTotal && parseFloat(item.quantidade) > 0 && (
-                    <p className="text-xs text-indigo-600">
+                    <p className="text-xs text-rdb-700">
                       Custo unitário: <strong>{num(parseFloat(item.custoTotal) / parseFloat(item.quantidade))}</strong>
                     </p>
                   )}
@@ -1509,7 +1513,7 @@ export default function ComprasPage() {
               </div>
             </div>
             {editItem.quantidade && editItem.custoTotal && parseFloat(editItem.quantidade) > 0 && (
-              <p className="text-xs text-indigo-600">
+              <p className="text-xs text-rdb-700">
                 Novo custo unitário: <strong>{num(parseFloat(editItem.custoTotal) / parseFloat(editItem.quantidade))}</strong>
               </p>
             )}
@@ -1587,5 +1591,13 @@ export default function ComprasPage() {
         </div>
       </Modal>
     </div>
+  )
+}
+
+export default function ComprasPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-400 py-8">Carregando…</div>}>
+      <ComprasContent />
+    </Suspense>
   )
 }

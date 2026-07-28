@@ -43,7 +43,7 @@ export default function FretePage() {
               {[['full', 'FULL'], ['flex', 'Flex / Envios']].map(([val, label]) => (
                 <button key={val} onClick={() => setTipo(val as 'full' | 'flex')}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all
-                    ${tipo === val ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                    ${tipo === val ? 'border-rdb-600 bg-rdb-50 text-rdb-800' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
                   {label}
                 </button>
               ))}
@@ -64,12 +64,12 @@ export default function FretePage() {
         </div>
 
         {freteCalc !== null && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-rdb-50 border border-rdb-200 rounded-xl p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm text-indigo-700">Custo de frete estimado ({tipo === 'full' ? 'FULL' : 'Flex/Envios'})</p>
-              <p className="text-3xl font-bold text-indigo-700 mt-1">{brl(freteCalc)}</p>
+              <p className="text-sm text-rdb-800">Custo de frete estimado ({tipo === 'full' ? 'FULL' : 'Flex/Envios'})</p>
+              <p className="text-3xl font-bold text-rdb-800 mt-1">{brl(freteCalc)}</p>
               {tipo === 'full' && precoN > 0 && (
-                <p className="text-xs text-indigo-500 mt-1">
+                <p className="text-xs text-rdb-600 mt-1">
                   Peso: {pesoN}kg · Preço: {brl(precoN)} · Faixa de preço: {FAIXAS_PRECO.find(f => precoN >= f.min && precoN <= f.max)?.label ?? 'R$199+'}
                 </p>
               )}
@@ -105,13 +105,13 @@ export default function FretePage() {
                 const isMatch = pesoN > 0 && pesoN <= maxPeso &&
                   (i === 0 || pesoN > TABELA_FRETE_FULL[i - 1][0])
                 return (
-                  <tr key={maxPeso} className={`tr-row ${isMatch ? 'bg-indigo-50 font-semibold' : ''}`}>
+                  <tr key={maxPeso} className={`tr-row ${isMatch ? 'bg-rdb-50 font-semibold' : ''}`}>
                     <td className="td text-xs font-medium text-gray-700 whitespace-nowrap">{label}</td>
                     {fretes.map((frete, j) => {
                       const faixaPreco = FAIXAS_PRECO[j]
                       const isColMatch = precoN >= faixaPreco.min && precoN <= faixaPreco.max
                       return (
-                        <td key={j} className={`td-r tabular-nums ${isMatch && isColMatch ? 'text-indigo-700 bg-indigo-100 rounded font-bold' : 'text-gray-600'}`}>
+                        <td key={j} className={`td-r tabular-nums ${isMatch && isColMatch ? 'text-rdb-800 bg-rdb-100 rounded font-bold' : 'text-gray-600'}`}>
                           {brl(frete)}
                         </td>
                       )

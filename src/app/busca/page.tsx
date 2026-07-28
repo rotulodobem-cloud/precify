@@ -1,6 +1,8 @@
 'use client'
-import { useState, useRef } from 'react'
-import { Search, Tag, TrendingUp, Package, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { Search, Tag, TrendingUp, Package, ChevronDown, ChevronUp, Calculator, ShoppingCart } from 'lucide-react'
 import { StatusBadge, Spinner } from '@/components/ui'
 
 const brl = (v?: number | null) => v != null ? `R$ ${v.toFixed(2).replace('.', ',')}` : '—'
@@ -16,21 +18,29 @@ interface ProdResult {
   compras: { id: string; dataCompra: string; custoUnitario: number; fornecedor: string; statusVariacao: string | null }[]
 }
 
-export default function BuscaPage() {
-  const [q, setQ] = useState('')
+function BuscaContent() {
+  const sp = useSearchParams()
+  const qInicial = sp.get('q') ?? ''
+  const [q, setQ] = useState(qInicial)
   const [results, setResults] = useState<ProdResult[]>([])
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const timerRef = useRef<NodeJS.Timeout>()
+  const reqRef = useRef(0)
 
-  const search = async (val: string) => {
+  const search = useCallback(async (val: string) => {
     if (val.length < 2) { setResults([]); return }
+    const seq = ++reqRef.current
     setLoading(true)
     const r = await fetch(`/api/busca?q=${encodeURIComponent(val)}`)
     const d = await r.json()
+    if (seq !== reqRef.current) return // resposta atrasada: descarta
     setResults(d.results ?? [])
     setLoading(false)
-  }
+  }, [])
+
+  // Busca já preenchida por link (busca global, dashboard, etc.)
+  useEffect(() => { if (qInicial.length >= 2) search(qInicial) }, [qInicial, search])
 
   const handleChange = (v: string) => {
     setQ(v)
@@ -70,7 +80,7 @@ export default function BuscaPage() {
           {/* Header */}
           <div className="px-4 py-3 bg-gray-900 text-white flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Package size={16} className="text-indigo-400" />
+              <Package size={16} className="text-rdb-400" />
               <div>
                 <span className="font-bold">{prod.nome}</span>
                 <span className="text-gray-400 text-sm ml-2">· {prod.skuPrincipal}</span>
@@ -83,6 +93,13 @@ export default function BuscaPage() {
             </div>
           </div>
 
+          {/* Ações do produto */}
+          <div className="px-4 py-2 bg-gray-800 flex items-center gap-2 flex-wrap">
+            <AcaoLink href={`/compras?aba=historico&q=${encodeURIComponent(prod.skuPrincipal)}`} icone={<ShoppingCart size={12} />} label="Histórico de compras" />
+            <AcaoLink href={`/lotes?q=${encodeURIComponent(prod.skuPrincipal)}`} icone={<Tag size={12} />} label="Lotes e validade" />
+            <AcaoLink href={`/variacoes?skuPrincipal=${encodeURIComponent(prod.skuPrincipal)}`} icone={<Package size={12} />} label="Editar variações" />
+          </div>
+
           {/* Variações */}
           {prod.variacoes.map(v => (
             <div key={v.id} className="border-b border-gray-100 last:border-0">
@@ -92,7 +109,7 @@ export default function BuscaPage() {
                 onClick={() => toggle(v.id)}
               >
                 <div className="flex items-center gap-3">
-                  <Tag size={13} className="text-indigo-500" />
+                  <Tag size={13} className="text-rdb-600" />
                   <span className="font-medium text-gray-800 text-sm">{v.nomeVariacao}</span>
                   <span className="text-xs text-gray-400 font-mono">{v.skuVariacao}</span>
                   {v.pesoGramas && <span className="badge-blue text-xs">{v.pesoGramas}g</span>}
@@ -106,6 +123,14 @@ export default function BuscaPage() {
               {/* Canais anunciados */}
               {expanded.has(v.id) && (
                 <div className="bg-gray-50 px-4 pb-3">
+                  <div className="pt-2">
+                    <Link
+                      href={`/precificacao-multicanal?skuVariacao=${encodeURIComponent(v.skuVariacao)}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-rdb-700 hover:text-rdb-800 transition-colors"
+                    >
+                      <Calculator size={12} /> Calcular preço no Multicanal
+                    </Link>
+                  </div>
                   {v.canaisAnunciados.length === 0 ? (
                     <p className="text-xs text-gray-400 py-3">Nenhum canal anunciado</p>
                   ) : (
@@ -121,11 +146,11 @@ export default function BuscaPage() {
                           </div>
                           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                             <div><p className="text-[10px] text-gray-400">Margem</p><p className="text-sm text-gray-700">{pct(c.margem)}</p></div>
-                            <div><p className="text-[10px] text-gray-400">Preço ideal</p><p className="text-sm font-bold text-indigo-600">{brl(c.precoIdeal)}</p></div>
+                            <div><p className="text-[10px] text-gray-400">Preço ideal</p><p className="text-sm font-bold text-rdb-700">{brl(c.precoIdeal)}</p></div>
                           </div>
                           <div className="mt-2.5 pt-2 border-t border-gray-100 text-center">
-                            <p className="text-[10px] text-gray-400">Preço promocional</p>
-                            <p className="text-xs font-bold text-purple-600">{brl(c.precoPromocional)}</p>
+                            <p className="text-[10px] text-gray-400">Preço de tabela (de)</p>
+                            <p className="text-xs text-gray-400 line-through">{brl(c.precoPromocional)}</p>
                           </div>
                         </div>
                       ))}
@@ -157,9 +182,25 @@ export default function BuscaPage() {
         <div className="card p-12 text-center text-gray-400">
           <Search size={32} className="mx-auto mb-3 opacity-30" />
           <p className="font-medium">Nenhum produto encontrado para "{q}"</p>
-          <p className="text-sm mt-1">Verifique o SKU ou <a href="/produtos" className="text-indigo-600 hover:underline">cadastre o produto</a></p>
+          <p className="text-sm mt-1">Verifique o SKU ou <a href="/produtos" className="text-rdb-700 hover:underline">cadastre o produto</a></p>
         </div>
       )}
     </div>
+  )
+}
+
+function AcaoLink({ href, icone, label }: { href: string; icone: React.ReactNode; label: string }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-1.5 text-xs text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-700 rounded-lg px-2.5 py-1 transition-colors">
+      {icone} {label}
+    </Link>
+  )
+}
+
+export default function BuscaPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-gray-400 py-8">Carregando…</div>}>
+      <BuscaContent />
+    </Suspense>
   )
 }

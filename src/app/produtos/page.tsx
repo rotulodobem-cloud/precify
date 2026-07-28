@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Pencil, Trash2, Search, RefreshCw, ChevronRight } from 'lucide-react'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
+import { useDebounce } from '@/lib/useDebounce'
 import Link from 'next/link'
 
 const brl = (v?: number | null) => v != null ? `R$ ${v.toFixed(2).replace('.', ',')}` : '—'
@@ -20,16 +21,20 @@ export default function ProdutosPage() {
   const [categorias, setCategorias] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState(''); const [filtroCat, setFiltroCat] = useState('Todas')
+  const qBusca = useDebounce(q)
   const [modal, setModal] = useState(false); const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState(emptyP); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
-    const r = await fetch(`/api/produtos?q=${q}&categoria=${filtroCat === 'Todas' ? '' : filtroCat}`)
+    const params = new URLSearchParams()
+    if (qBusca) params.set('q', qBusca)
+    if (filtroCat !== 'Todas') params.set('categoria', filtroCat)
+    const r = await fetch('/api/produtos?' + params)
     const d = await r.json()
     setProdutos(d.produtos ?? []); setCategorias(d.categorias ?? [])
     setLoading(false)
-  }, [q, filtroCat])
+  }, [qBusca, filtroCat])
   useEffect(() => { load() }, [load])
 
   const openAdd = () => { setForm(emptyP); setEditing(null); setError(''); setModal(true) }
@@ -85,21 +90,21 @@ export default function ProdutosPage() {
             {!loading && !produtos.length && <Empty msg="Nenhum produto encontrado" />}
             {produtos.map(p => (
               <tr key={p.skuPrincipal} className="tr-row">
-                <td className="td font-mono text-xs font-bold text-indigo-600">{p.skuPrincipal}</td>
+                <td className="td font-mono text-xs font-bold text-rdb-700">{p.skuPrincipal}</td>
                 <td className="td font-medium text-gray-800">{p.nome}</td>
                 <td className="td text-xs text-gray-500">{p.categoria}</td>
                 <td className="td text-xs text-gray-500">{p.unidadeCompra}</td>
                 <td className="td-r font-semibold">{brl(p.custoAtualizado)}</td>
                 <td className="td text-xs text-gray-500">{p.fornecedorPrincipal ?? '—'}</td>
                 <td className="td text-center">
-                  <Link href={`/variacoes?skuPrincipal=${p.skuPrincipal}`} className="inline-flex items-center gap-0.5 text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                  <Link href={`/variacoes?skuPrincipal=${p.skuPrincipal}`} className="inline-flex items-center gap-0.5 text-rdb-700 hover:text-rdb-800 text-xs font-medium">
                     {p.variacoes.length} <ChevronRight size={11} />
                   </Link>
                 </td>
                 <td className="td text-center"><StatusBadge status={p.status} /></td>
                 <td className="td">
                   <div className="flex gap-1.5 justify-end">
-                    <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={13} /></button>
+                    <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-rdb-700 transition-colors"><Pencil size={13} /></button>
                     <button onClick={() => del(p.skuPrincipal)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>

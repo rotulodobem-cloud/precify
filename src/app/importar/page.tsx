@@ -310,20 +310,20 @@ export default function ImportarPage() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setModo('planilha')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${modo === 'planilha' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><FileSpreadsheet size={15} /> Planilha de compras</button>
-        <button onClick={() => setModo('lista')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${modo === 'lista' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><FileText size={15} /> Lista de preços</button>
-        <button onClick={() => setModo('comparar')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${modo === 'comparar' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}><BarChart2 size={15} /> Comparar fornecedores</button>
+        <button onClick={() => setModo('planilha')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${modo === 'planilha' ? 'bg-rdb-700 text-white border-rdb-700' : 'bg-white text-gray-600 border-gray-200 hover:border-rdb-300'}`}><FileSpreadsheet size={15} /> Planilha de compras</button>
+        <button onClick={() => setModo('lista')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${modo === 'lista' ? 'bg-rdb-700 text-white border-rdb-700' : 'bg-white text-gray-600 border-gray-200 hover:border-rdb-300'}`}><FileText size={15} /> Lista de preços</button>
+        <button onClick={() => setModo('comparar')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${modo === 'comparar' ? 'bg-rdb-700 text-white border-rdb-700' : 'bg-white text-gray-600 border-gray-200 hover:border-rdb-300'}`}><BarChart2 size={15} /> Comparar fornecedores</button>
       </div>
 
       {/* ── PLANILHA ── */}
       {modo === 'planilha' && (<>
         <div className="flex items-center gap-2 text-xs">
-          {['Upload', 'Validação', 'Concluído'].map((s, i) => (<div key={s} className="flex items-center gap-2"><div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${etapa === ['upload','validacao','concluido'][i] ? 'bg-indigo-600 text-white' : i < ['upload','validacao','concluido'].indexOf(etapa) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{i < ['upload','validacao','concluido'].indexOf(etapa) ? '✓' : i + 1}</div><span className={etapa === ['upload','validacao','concluido'][i] ? 'font-semibold text-gray-800' : 'text-gray-400'}>{s}</span>{i < 2 && <div className="w-8 h-px bg-gray-200" />}</div>))}
+          {['Upload', 'Validação', 'Concluído'].map((s, i) => (<div key={s} className="flex items-center gap-2"><div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${etapa === ['upload','validacao','concluido'][i] ? 'bg-rdb-700 text-white' : i < ['upload','validacao','concluido'].indexOf(etapa) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{i < ['upload','validacao','concluido'].indexOf(etapa) ? '✓' : i + 1}</div><span className={etapa === ['upload','validacao','concluido'][i] ? 'font-semibold text-gray-800' : 'text-gray-400'}>{s}</span>{i < 2 && <div className="w-8 h-px bg-gray-200" />}</div>))}
         </div>
         {error && <Alert type="error">{error}</Alert>}
         {etapa === 'upload' && (<div className="space-y-4">
           <div className="card p-4 bg-blue-50 border-blue-100 text-sm text-blue-700"><p className="font-semibold">Colunas: <strong>Data | Nome do produto | Fornecedor | Quantidade | Valor total</strong> + SKU (opcional)</p></div>
-          <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'}`} onDragOver={e => { e.preventDefault(); setDragOver(true) }} onDragLeave={() => setDragOver(false)} onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }} onClick={() => ref.current?.click()}>
+          <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-rdb-400 bg-rdb-50' : 'border-gray-200 hover:border-rdb-300'}`} onDragOver={e => { e.preventDefault(); setDragOver(true) }} onDragLeave={() => setDragOver(false)} onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }} onClick={() => ref.current?.click()}>
             <FileSpreadsheet size={40} className="mx-auto text-gray-300 mb-3" /><p className="font-medium text-gray-600">{file ? file.name : 'Arraste a planilha ou clique'}</p><p className="text-xs text-gray-400 mt-1">.xlsx ou .xls</p>
             <input ref={ref} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
           </div>
@@ -347,7 +347,7 @@ export default function ImportarPage() {
           <button onClick={confirmar} disabled={confirmando} className="btn-primary w-full justify-center py-3 font-semibold">{confirmando ? <Spinner size={16} /> : <CheckCircle2 size={16} />}{confirmando ? 'Lançando…' : `Confirmar ${linhas.length} compra(s)`}</button>
         </div>)}
         {etapa === 'concluido' && resultado && (<div className="space-y-4">
-          <div className="card p-6 text-center"><CheckCircle2 size={48} className="mx-auto text-emerald-500 mb-3" /><h2 className="text-xl font-bold mb-1">Importação concluída!</h2><div className="flex justify-center gap-6 mt-4"><div><div className="text-2xl font-bold">{String(resultado.total ?? 0)}</div><div className="text-xs text-gray-500">Total</div></div><div><div className="text-2xl font-bold text-emerald-600">{String(resultado.criados ?? 0)}</div><div className="text-xs text-gray-500">Novos</div></div><div><div className="text-2xl font-bold text-indigo-600">{String(resultado.atualizados ?? 0)}</div><div className="text-xs text-gray-500">Atualizados</div></div></div></div>
+          <div className="card p-6 text-center"><CheckCircle2 size={48} className="mx-auto text-emerald-500 mb-3" /><h2 className="text-xl font-bold mb-1">Importação concluída!</h2><div className="flex justify-center gap-6 mt-4"><div><div className="text-2xl font-bold">{String(resultado.total ?? 0)}</div><div className="text-xs text-gray-500">Total</div></div><div><div className="text-2xl font-bold text-emerald-600">{String(resultado.criados ?? 0)}</div><div className="text-xs text-gray-500">Novos</div></div><div><div className="text-2xl font-bold text-rdb-700">{String(resultado.atualizados ?? 0)}</div><div className="text-xs text-gray-500">Atualizados</div></div></div></div>
           <div className="flex gap-3"><button onClick={() => { setEtapa('upload'); setFile(null); setLinhas([]); setResultado(null) }} className="btn-ghost flex-1 justify-center"><Upload size={14} /> Nova importação</button><a href="/compras" className="btn-primary flex-1 justify-center text-center">Ver compras →</a></div>
         </div>)}
       </>)}
@@ -357,7 +357,7 @@ export default function ImportarPage() {
         {listaError && <Alert type="error">{listaError}</Alert>}
         {listaEtapa === 'upload' && (<>
           <div className="card p-4 bg-blue-50 border-blue-100 text-sm text-blue-700"><p className="font-semibold">Lista de preços do fornecedor</p><p>Suba o Excel com a lista. O sistema mostra variação vs. última compra e permite exportar o pedido.</p></div>
-          <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${listaDragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'}`} onDragOver={e => { e.preventDefault(); setListaDragOver(true) }} onDragLeave={() => setListaDragOver(false)} onDrop={e => { e.preventDefault(); setListaDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleListaFile(f) }} onClick={() => listaRef.current?.click()}>
+          <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${listaDragOver ? 'border-rdb-400 bg-rdb-50' : 'border-gray-200 hover:border-rdb-300'}`} onDragOver={e => { e.preventDefault(); setListaDragOver(true) }} onDragLeave={() => setListaDragOver(false)} onDrop={e => { e.preventDefault(); setListaDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleListaFile(f) }} onClick={() => listaRef.current?.click()}>
             <FileText size={40} className="mx-auto text-gray-300 mb-3" /><p className="font-medium text-gray-600">{listaFile ? listaFile.name : 'Arraste o arquivo ou clique'}</p><p className="text-xs text-gray-400 mt-1">.xlsx, .xls ou .pdf</p>
             <input ref={listaRef} type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleListaFile(f) }} />
           </div>
@@ -375,9 +375,9 @@ export default function ImportarPage() {
           <div className="space-y-1.5 max-h-[60vh] overflow-y-auto pr-1">
             {produtosFiltrados.map((p, idx) => {
               const idxReal = listaProdutos.indexOf(p)
-              return (<div key={idx} onClick={() => toggleSelecionado(idxReal)} className={`border rounded-xl p-3 cursor-pointer flex items-center gap-3 ${p.selecionado ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${p.selecionado ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>{p.selecionado && <span className="text-white text-xs">✓</span>}</div>
-                <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{p.descricao}</div>{p.skuInterno ? <div className="text-xs text-indigo-600">↳ {p.skuInterno} — {p.nomeInterno}</div> : <div className="text-xs text-gray-400">Não cadastrado</div>}</div>
+              return (<div key={idx} onClick={() => toggleSelecionado(idxReal)} className={`border rounded-xl p-3 cursor-pointer flex items-center gap-3 ${p.selecionado ? 'border-rdb-400 bg-rdb-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${p.selecionado ? 'bg-rdb-700 border-rdb-700' : 'border-gray-300'}`}>{p.selecionado && <span className="text-white text-xs">✓</span>}</div>
+                <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{p.descricao}</div>{p.skuInterno ? <div className="text-xs text-rdb-700">↳ {p.skuInterno} — {p.nomeInterno}</div> : <div className="text-xs text-gray-400">Não cadastrado</div>}</div>
                 <div className="text-right shrink-0"><div className="text-sm font-semibold">{brl(p.preco)}</div>{p.qtdEmbalagem && <div className="text-xs text-gray-500">{brl(p.preco / p.qtdEmbalagem)}/kg</div>}{p.variacao !== null ? <div className={`text-xs ${corVar(p.variacao)}`}>{p.variacao > 0 ? '↑' : '↓'} {Math.abs(p.variacao).toFixed(1)}%</div> : <div className="text-xs text-gray-400">sem histórico</div>}</div>
               </div>)
             })}
@@ -403,7 +403,7 @@ export default function ImportarPage() {
             ))}
           </div>
 
-          <div className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all border-gray-200 hover:border-indigo-300`} onClick={() => cmpRef.current?.click()}>
+          <div className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all border-gray-200 hover:border-rdb-300`} onClick={() => cmpRef.current?.click()}>
             <Plus size={32} className="mx-auto text-gray-300 mb-2" />
             <p className="font-medium text-gray-600">Adicionar lista de fornecedor</p>
             <p className="text-xs text-gray-400 mt-1">.xlsx ou .xls</p>
@@ -439,7 +439,7 @@ export default function ImportarPage() {
 
           <div className="text-xs text-gray-500 flex gap-4">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300 inline-block" /> Melhor preço</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-400 inline-block" /> Selecionado</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-rdb-100 border border-rdb-400 inline-block" /> Selecionado</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -468,7 +468,7 @@ export default function ImportarPage() {
                               <button
                                 onClick={() => escolherFornecedor(cmpTabela.indexOf(linha), l.id)}
                                 className={`inline-flex flex-col items-end px-2 py-1 rounded-lg border transition-all w-full
-                                  ${isEscolhido ? 'bg-indigo-100 border-indigo-400 ring-1 ring-indigo-400' : isMelhor ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                                  ${isEscolhido ? 'bg-rdb-100 border-rdb-400 ring-1 ring-rdb-400' : isMelhor ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
                               >
                                 <span className={`font-semibold text-xs ${isMelhor ? 'text-emerald-700' : 'text-gray-700'}`}>{brl(p.precoKg)}/kg</span>
                                 <span className="text-[10px] text-gray-400">{brl(p.preco)} · {p.qtd ?? '?'}{p.un}</span>
@@ -486,8 +486,8 @@ export default function ImportarPage() {
           </div>
 
           {cmpTabela.some(l => l.fornecedorEscolhido) && (
-            <div className="card p-3 bg-indigo-50 border-indigo-200 flex items-center justify-between">
-              <span className="text-sm text-indigo-800 font-medium">{cmpTabela.filter(l => l.fornecedorEscolhido).length} produto(s) selecionado(s) · {new Set(cmpTabela.filter(l => l.fornecedorEscolhido).map(l => l.fornecedorEscolhido)).size} pedido(s)</span>
+            <div className="card p-3 bg-rdb-50 border-rdb-200 flex items-center justify-between">
+              <span className="text-sm text-rdb-800 font-medium">{cmpTabela.filter(l => l.fornecedorEscolhido).length} produto(s) selecionado(s) · {new Set(cmpTabela.filter(l => l.fornecedorEscolhido).map(l => l.fornecedorEscolhido)).size} pedido(s)</span>
               <button onClick={exportarPedidos} className="btn-primary text-sm"><Download size={14} /> Exportar pedidos separados</button>
             </div>
           )}

@@ -165,7 +165,7 @@ export default function DashboardPage() {
                 <div key={c.categoria} className="flex items-center gap-3">
                   <span className="text-sm text-gray-700 w-28 truncate">{c.categoria}</span>
                   <div className="flex-1 bg-gray-100 rounded-full h-2">
-                    <div className="h-2 rounded-full bg-indigo-500 transition-all" style={{ width: `${Math.min(Math.max(c.margemMedia, 0) * 100 / 35, 100)}%` }} />
+                    <div className="h-2 rounded-full bg-rdb-600 transition-all" style={{ width: `${Math.min(Math.max(c.margemMedia, 0) * 100 / 35, 100)}%` }} />
                   </div>
                   <span className="text-xs font-semibold text-gray-700 w-14 text-right tabular-nums">{pct(c.margemMedia)}</span>
                   <span className="text-xs text-gray-400 w-16 text-right">{c.n} canais</span>
@@ -201,7 +201,7 @@ export default function DashboardPage() {
 }
 
 function StatCard({ title, value, sub, icon: Icon, color }: { title: string; value: unknown; sub?: string; icon: React.ElementType; color: string }) {
-  const colors: Record<string, string> = { indigo: 'bg-indigo-50 text-indigo-600', emerald: 'bg-emerald-50 text-emerald-600', amber: 'bg-amber-50 text-amber-600', blue: 'bg-blue-50 text-blue-600' }
+  const colors: Record<string, string> = { indigo: 'bg-rdb-50 text-rdb-700', emerald: 'bg-emerald-50 text-emerald-600', amber: 'bg-amber-50 text-amber-600', blue: 'bg-blue-50 text-blue-600' }
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">

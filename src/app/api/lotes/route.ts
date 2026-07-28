@@ -7,7 +7,11 @@ export async function GET(req: NextRequest) {
   const vencendo = searchParams.get('vencendo')
 
   const where: Record<string, unknown> = {}
-  if (q) where.numeroLote = { contains: q, mode: 'insensitive' }
+  if (q) where.OR = [
+    { numeroLote: { contains: q, mode: 'insensitive' } },
+    { compra: { nomeProduto: { contains: q, mode: 'insensitive' } } },
+    { compra: { skuPrincipal: { contains: q, mode: 'insensitive' } } },
+  ]
   if (vencendo) {
     const limite = new Date()
     limite.setDate(limite.getDate() + 30)

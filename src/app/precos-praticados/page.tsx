@@ -97,7 +97,7 @@ export default function PrecosPraticadosPage() {
       <div className="flex items-center gap-2 text-xs">
         {['Upload', 'Prévia', 'Concluído'].map((s, i) => (
           <div key={s} className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${etapa === PASSOS[i] ? 'bg-indigo-600 text-white' : i < PASSOS.indexOf(etapa) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${etapa === PASSOS[i] ? 'bg-rdb-700 text-white' : i < PASSOS.indexOf(etapa) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
               {i < PASSOS.indexOf(etapa) ? '✓' : i + 1}
             </div>
             <span className={etapa === PASSOS[i] ? 'font-semibold text-gray-800' : 'text-gray-400'}>{s}</span>
@@ -114,7 +114,7 @@ export default function PrecosPraticadosPage() {
             <p className="font-semibold">Colunas esperadas: <strong>Código (ou SKU)</strong> e <strong>Preço</strong></p>
             <p className="mt-1">O código deve bater com o SKU de variação já cadastrado no sistema (ex: 242-O1kg). Se o produto ainda não tiver um cálculo no Multicanal RdB, um é criado automaticamente com os valores padrão.</p>
           </div>
-          <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'}`}
+          <div className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${dragOver ? 'border-rdb-400 bg-rdb-50' : 'border-gray-200 hover:border-rdb-300'}`}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}

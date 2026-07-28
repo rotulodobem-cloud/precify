@@ -68,7 +68,7 @@ export default function PlataformasPage() {
                   <div><div className="font-semibold text-gray-900">{p.nome}</div><div className="text-xs text-gray-400">/{p.slug}</div></div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={15} /></button>
+                  <button onClick={() => openEdit(p)} className="text-gray-300 hover:text-rdb-700 transition-colors"><Pencil size={15} /></button>
                   <button onClick={() => remover(p)} className="text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={15} /></button>
                 </div>
               </div>
@@ -78,7 +78,7 @@ export default function PlataformasPage() {
                 ))}
               </div>
               <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-                <div className="flex justify-between"><span>Divisor ideal (25%):</span><span className="font-mono font-semibold text-indigo-700">{(1 - p.comissaoPct - p.impostoPct - 0.25).toFixed(3)}</span></div>
+                <div className="flex justify-between"><span>Divisor ideal (25%):</span><span className="font-mono font-semibold text-rdb-800">{(1 - p.comissaoPct - p.impostoPct - 0.25).toFixed(3)}</span></div>
               </div>
               {p.observacoes && <p className="text-xs text-gray-400 mt-2 italic">{p.observacoes}</p>}
             </div>
@@ -106,13 +106,13 @@ export default function PlataformasPage() {
             <div><label className="lbl">Cor hex</label><input className="inp h-9 p-0.5 cursor-pointer" type="color" value={form.corHex} onChange={f('corHex')} /></div>
           </div>
           {form.comissaoPct && (
-            <div className="bg-indigo-50 rounded-xl p-3 text-xs">
-              <p className="font-semibold text-indigo-800 mb-1.5">Simulação com custo R$10,00:</p>
+            <div className="bg-rdb-50 rounded-xl p-3 text-xs">
+              <p className="font-semibold text-rdb-800 mb-1.5">Simulação com custo R$10,00:</p>
               <div className="grid grid-cols-3 gap-2">
                 {[['Mínimo 20%', 0], ['Ideal 25%', 1], ['Máximo 30%', 2]].map(([label, idx]) => (
                   <div key={String(label)} className="bg-white rounded-lg p-2 text-center">
                     <div className="text-gray-500">{label}</div>
-                    <div className="font-bold text-indigo-700">R$ {sim(form.comissaoPct, form.impostoPct)[idx as number]}</div>
+                    <div className="font-bold text-rdb-800">R$ {sim(form.comissaoPct, form.impostoPct)[idx as number]}</div>
                   </div>
                 ))}
               </div>

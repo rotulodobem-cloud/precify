@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CANAIS_MULTICANAL, CanalConfig, CanalDef, ResultadoCanal, calcularCanalModoPreco, calcularCanalModoAnalise } from '@/lib/calculosMulticanal'
+import { useDebounce } from '@/lib/useDebounce'
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pctf = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
@@ -46,6 +47,7 @@ export default function PrecificacaoMulticanalPage() {
   // Biblioteca
   const [biblioteca, setBiblioteca] = useState<any[]>([])
   const [libFiltro, setLibFiltro] = useState('')
+  const libFiltroBusca = useDebounce(libFiltro)
   const [salvando, setSalvando] = useState(false)
   const [msgSalvo, setMsgSalvo] = useState('')
 
@@ -71,7 +73,7 @@ export default function PrecificacaoMulticanalPage() {
     setBiblioteca(r.ok ? await r.json() : [])
   }, [])
 
-  useEffect(() => { carregarBiblioteca(libFiltro) }, [libFiltro, carregarBiblioteca])
+  useEffect(() => { carregarBiblioteca(libFiltroBusca) }, [libFiltroBusca, carregarBiblioteca])
 
   const buscarProduto = useCallback((valor: string) => {
     setQ(valor)
@@ -123,6 +125,25 @@ export default function PrecificacaoMulticanalPage() {
       if (calculoSalvo) aplicarCalculoSalvo(calculoSalvo)
     }
   }
+
+  // Abertura via link (busca global, tela de busca): /precificacao-multicanal?skuVariacao=…
+  useEffect(() => {
+    const alvo = new URLSearchParams(window.location.search).get('skuVariacao')
+    if (!alvo) return
+    ;(async () => {
+      const r = await fetch(`/api/busca?q=${encodeURIComponent(alvo)}`)
+      const { results } = r.ok ? await r.json() : { results: [] }
+      const produto: ProdutoBusca | undefined = results[0]
+      if (!produto) return
+      const variacao = produto.variacoes.find(v => v.skuVariacao === alvo)
+      setProdutoSel(produto)
+      setSku(produto.skuPrincipal)
+      setNome(produto.nome)
+      if (variacao) selecionarVariacao(variacao)
+      else setCustoProduto(produto.custoAtualizado ?? 0)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const limparProduto = () => {
     setProdutoSel(null); setSkuVariacaoLigado(null)

@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Pencil, Trash2, Search, RefreshCw, Package, X, Calculator } from 'lucide-react'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
+import { useDebounce } from '@/lib/useDebounce'
 import Link from 'next/link'
 
 const brl = (v?: number | null) => v != null ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) : '—'
@@ -48,6 +49,7 @@ export default function KitsPage() {
   const [kits, setKits] = useState<Kit[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const qBusca = useDebounce(q)
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -59,10 +61,10 @@ export default function KitsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const r = await fetch(`/api/kits?q=${q}`)
+    const r = await fetch('/api/kits?q=' + encodeURIComponent(qBusca))
     setKits(await r.json())
     setLoading(false)
-  }, [q])
+  }, [qBusca])
 
   useEffect(() => { load() }, [load])
 
@@ -200,16 +202,16 @@ export default function KitsPage() {
             {!loading && !kits.length && <Empty msg="Nenhum kit cadastrado" />}
             {kits.map(kit => (
               <tr key={kit.id} className="tr-row">
-                <td className="td font-mono text-xs font-bold text-indigo-600">{kit.skuKit}</td>
+                <td className="td font-mono text-xs font-bold text-rdb-700">{kit.skuKit}</td>
                 <td className="td font-medium text-gray-800">{kit.nome}</td>
                 <td className="td">
                   <div className="flex flex-wrap gap-1">
                     {kit.componentes.map((c, i) => (
-                      <span key={i} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
+                      <span key={i} className="text-xs bg-rdb-50 text-rdb-800 px-2 py-0.5 rounded-full">
                         {c.nomeProduto}
                         {c.quantidadeGramas && ` ${c.quantidadeGramas}g`}
                         {c.quantidadeUn && ` ${c.quantidadeUn}un`}
-                        <span className="text-indigo-400 ml-1">= {brl(c.custoUnitario)}</span>
+                        <span className="text-rdb-400 ml-1">= {brl(c.custoUnitario)}</span>
                       </span>
                     ))}
                   </div>
@@ -219,7 +221,7 @@ export default function KitsPage() {
                 <td className="td text-center"><StatusBadge status={kit.status} /></td>
                 <td className="td">
                   <div className="flex gap-1.5 justify-end">
-                    <button onClick={() => openEdit(kit)} className="text-gray-300 hover:text-indigo-600 transition-colors"><Pencil size={13} /></button>
+                    <button onClick={() => openEdit(kit)} className="text-gray-300 hover:text-rdb-700 transition-colors"><Pencil size={13} /></button>
                     <button onClick={() => del(kit.skuKit)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </td>
@@ -286,7 +288,7 @@ export default function KitsPage() {
                             placeholder="220" />
                           {buscandoProd[idx] && <div className="absolute right-2 top-2.5"><Spinner size={13} /></div>}
                         </div>
-                        {comp.nomeProduto && <p className="text-xs text-indigo-600 mt-0.5">✓ {comp.nomeProduto}</p>}
+                        {comp.nomeProduto && <p className="text-xs text-rdb-700 mt-0.5">✓ {comp.nomeProduto}</p>}
                       </div>
                       <div>
                         <label className="lbl">Nome (preenchido auto)</label>
@@ -321,7 +323,7 @@ export default function KitsPage() {
                     </div>
                     <div className="flex-1">
                       <label className="lbl">Custo deste componente</label>
-                      <div className={`inp bg-gray-100 font-semibold ${comp.custoUnitario > 0 ? 'text-indigo-700' : 'text-gray-400'}`}>
+                      <div className={`inp bg-gray-100 font-semibold ${comp.custoUnitario > 0 ? 'text-rdb-800' : 'text-gray-400'}`}>
                         {comp.custoUnitario > 0 ? brl(comp.custoUnitario) : 'calculado auto'}
                       </div>
                     </div>
@@ -346,26 +348,26 @@ export default function KitsPage() {
           </div>
 
           {/* Preview do custo total */}
-          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+          <div className="bg-rdb-50 border border-rdb-100 rounded-xl p-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-indigo-800">Custo total do kit</span>
-              <span className="text-xl font-bold text-indigo-700">{brl(custoTotalPreview)}</span>
+              <span className="text-sm font-semibold text-rdb-800">Custo total do kit</span>
+              <span className="text-xl font-bold text-rdb-800">{brl(custoTotalPreview)}</span>
             </div>
             <div className="mt-2 space-y-1">
               {componentes.map((c, i) => c.custoUnitario > 0 && (
-                <div key={i} className="flex justify-between text-xs text-indigo-600">
+                <div key={i} className="flex justify-between text-xs text-rdb-700">
                   <span>{c.nomeProduto || c.skuProduto} {c.quantidadeGramas ? `(${c.quantidadeGramas}g)` : c.quantidadeUn ? `(${c.quantidadeUn}un)` : ''}</span>
                   <span>{brl(c.custoUnitario)}</span>
                 </div>
               ))}
               {parseFloat(form.custoEmbalagem) > 0 && (
-                <div className="flex justify-between text-xs text-indigo-600">
+                <div className="flex justify-between text-xs text-rdb-700">
                   <span>Embalagem</span>
                   <span>{brl(parseFloat(form.custoEmbalagem))}</span>
                 </div>
               )}
             </div>
-            <p className="text-xs text-indigo-500 mt-2">
+            <p className="text-xs text-rdb-600 mt-2">
               No Multicanal RdB, use o SKU <strong>{form.skuKit || 'do kit'}</strong> para ver os preços por canal com margem, frete, imposto e comissão.
             </p>
           </div>

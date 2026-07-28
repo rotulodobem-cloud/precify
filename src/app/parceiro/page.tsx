@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { Search, RefreshCw, Save } from 'lucide-react'
+import { useDebounce } from '@/lib/useDebounce'
 
 const brl = (v?: number | null) => v != null ? `R$ ${v.toFixed(2).replace('.', ',')}` : '—'
 
@@ -19,6 +20,7 @@ export default function ParceiroPage() {
   const [linhas, setLinhas] = useState<LinhaParceiro[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
+  const qBusca = useDebounce(q)
   const [plataforma, setPlataforma] = useState('')
   const [edit, setEdit] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState<Record<string, boolean>>({})
@@ -26,13 +28,13 @@ export default function ParceiroPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (q) params.set('q', q)
+    if (qBusca) params.set('q', qBusca)
     if (plataforma) params.set('plataforma', plataforma)
     const r = await fetch(`/api/parceiro/precificacao?${params}`)
     const d = await r.json()
     setLinhas(Array.isArray(d) ? d : [])
     setLoading(false)
-  }, [q, plataforma])
+  }, [qBusca, plataforma])
   useEffect(() => { load() }, [load])
 
   const salvarCodigo = async (id: string) => {
@@ -50,7 +52,10 @@ export default function ParceiroPage() {
     <div className="space-y-4">
       <div>
         <h1 className="page-title">Anúncios</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Preço de venda, preço promocional e código do anúncio por plataforma</p>
+        <p className="text-sm text-gray-500 mt-0.5">Preço de tabela, preço de venda e código do anúncio por plataforma</p>
+        <p className="text-sm text-gray-600 mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block">
+          Anuncie pelo <strong>preço de venda</strong>. O preço de tabela é o valor cheio, usado só para exibir o desconto (“de / por”).
+        </p>
       </div>
 
       <div className="card p-2.5 flex items-center gap-2 flex-wrap">
@@ -71,7 +76,7 @@ export default function ParceiroPage() {
           <thead className="tbl-head"><tr>
             <th className="th">SKU</th><th className="th">Produto</th><th className="th">Variação</th>
             <th className="th">Plataforma</th><th className="th">Código do anúncio</th>
-            <th className="th-r">Preço de venda</th><th className="th-r">Preço promocional</th>
+            <th className="th-r">Preço de tabela (de)</th><th className="th-r">Preço de venda (por)</th>
           </tr></thead>
           <tbody>
             {loading && <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Carregando…</td></tr>}
@@ -95,8 +100,8 @@ export default function ParceiroPage() {
                     </button>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-sm text-right font-medium">{brl(l.precoIdeal)}</td>
-                <td className="px-3 py-2 text-sm text-right font-medium text-indigo-600">{brl(l.precoPromocional)}</td>
+                <td className="px-3 py-2 text-sm text-right text-gray-400 line-through">{brl(l.precoPromocional)}</td>
+                <td className="px-3 py-2 text-sm text-right font-bold text-rdb-700">{brl(l.precoIdeal)}</td>
               </tr>
             ))}
           </tbody>
