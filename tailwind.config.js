@@ -21,10 +21,13 @@ module.exports = {
         fundo: '#F4F7EF',         // fundo da aplicação
         tinta: '#16241C',         // texto principal
         'tinta-fraca': '#5C6B60', // texto secundário
-        // Semânticas: usar SOMENTE com significado
+        // Semânticas: usar SOMENTE com significado.
+        // Verificadas com o validador de paleta (scripts/validate_palette.js):
+        // separação em protanopia ΔE 7.5 e visão normal ΔE 21.7, o que exige
+        // que apareçam sempre acompanhadas de rótulo — nunca cor sozinha.
         ok: '#2E9E4F',
-        atencao: '#D97706',
-        perigo: '#C0392B',
+        atencao: '#E09E12',
+        perigo: '#A21309',
       },
       fontFamily: {
         titulo: ['var(--fonte-titulo)', 'system-ui', 'sans-serif'],
