@@ -118,7 +118,7 @@ export default function Sidebar() {
         </a>
       </div>
       <div className="px-4 pb-3">
-        <p className="text-rdb-400 text-[10px]">v2.0 · SQLite · Next.js 14</p>
+        <p className="text-rdb-400 text-[10px]">v2.0 · PostgreSQL · Next.js 14</p>
       </div>
     </aside>
   )
