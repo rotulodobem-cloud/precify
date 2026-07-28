@@ -47,6 +47,68 @@
   .badge-blue     { @apply badge bg-rdb-100 text-rdb-700; }
   .badge-purple   { @apply badge bg-rdb-100 text-rdb-700; }
 
+  /* ── Multicanal (Central de Precificação) ──
+     Layout próprio desta tela. Cores e sombras vêm dos mesmos tokens
+     das demais telas — nada de cor literal aqui. */
+  .rdb { @apply -m-6 pb-10 min-h-screen; }
+  .rdb-header { @apply bg-rdb-700 text-white px-6 pt-7 pb-8; }
+  .rdb-header .brand { @apply flex items-center gap-2.5 mb-3; }
+  .rdb-header .brand strong { @apply font-titulo font-semibold text-[15px]; }
+  .rdb-header .brand small { @apply block text-[10px] uppercase font-semibold text-limao tracking-[.16em]; }
+  .rdb-header h1 { @apply text-[22px] font-bold; }
+  .rdb-header h1 span { @apply text-limao; }
+  .rdb-main { @apply max-w-[1180px] mx-auto px-5; }
+  .rdb-toggle { @apply flex gap-1.5 bg-white border border-rdb-200 rounded-2xl p-1.5 mx-auto mb-5 max-w-[560px] shadow-rdb; margin-top: -20px; }
+  .rdb-toggle button { @apply flex-1 border-0 bg-transparent px-2.5 py-3 rounded-lg cursor-pointer font-titulo font-semibold text-[13px] text-tinta-fraca; }
+  .rdb-toggle button.on { @apply bg-rdb-700 text-white; }
+  .rdb-tol { @apply flex items-center justify-center gap-2 text-[12.5px] font-semibold text-tinta-fraca mx-auto mb-5; margin-top: -8px; }
+  .rdb-tol input { @apply w-14 font-titulo font-semibold text-[13px] border-[1.5px] border-rdb-200 rounded-lg px-2 py-1.5 text-center bg-white; }
+  .rdb-lp-praticado { @apply mx-3.5 mt-2.5; }
+  .rdb-lp-selo { @apply inline-block mt-1.5; }
+  .rdb-card { @apply bg-white border border-rdb-200 rounded-2xl shadow-rdb px-5 py-4 mb-[18px]; }
+  .rdb-card h2 { @apply text-[15px] font-semibold mb-3; }
+  .rdb-field label { @apply block text-xs font-semibold mb-1.5; }
+  .rdb-field input { @apply w-full font-titulo font-medium text-sm text-tinta border-[1.5px] border-rdb-200 rounded-[10px] px-[11px] py-2.5 bg-white; }
+  .rdb-field input:focus { @apply outline-none border-rdb-700; box-shadow: 0 0 0 3px rgba(5, 94, 43, .13); }
+  .rdb-grid3 { @apply grid gap-3 mb-3.5; grid-template-columns: 1fr 2fr 1fr; }
+  .rdb-grid-metas { @apply grid gap-3; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .rdb-sugestoes { @apply border border-rdb-200 rounded-[10px] mt-1 overflow-hidden; }
+  .rdb-sugestoes button { @apply block w-full text-left px-3 py-2 bg-white border-0 border-b border-rdb-100 cursor-pointer text-[13px]; }
+  .rdb-sugestoes button:hover { @apply bg-rdb-50; }
+  .rdb-chans { @apply grid gap-4 mt-1; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .rdb-chan { @apply bg-white border border-rdb-200 rounded-2xl shadow-rdb overflow-hidden; }
+  .rdb-chan-head { @apply flex items-center gap-2 px-3.5 pt-3; }
+  .rdb-chan-ic { @apply w-[30px] h-[30px] rounded-lg flex items-center justify-center font-titulo font-bold text-[11px]; }
+  .rdb-chan-nome { @apply font-titulo font-semibold text-[13px] leading-[1.15]; }
+  .rdb-chan-nome span { @apply block font-corpo font-semibold text-[10px] text-tinta-fraca; }
+  .rdb-price { @apply mx-3.5 my-2.5 bg-rdb-700 text-white rounded-xl px-[15px] py-3.5; }
+  .rdb-price.neg { @apply bg-perigo; }
+  .rdb-price .lb { @apply text-[10px] uppercase text-limao font-bold tracking-[.12em]; }
+  .rdb-price.neg .lb { @apply text-white opacity-85; }
+  .rdb-price .big { @apply font-titulo font-bold text-[28px] mt-0.5; }
+  .rdb-price .sub { @apply text-[11.5px] text-rdb-200 mt-0.5; }
+  .rdb-price.neg .sub { @apply text-white; }
+  .rdb-promo { @apply mx-3.5 mb-2.5 bg-rdb-50 border border-rdb-200 rounded-[10px] px-3 py-2.5; }
+  .rdb-promo .lb { @apply text-[9.5px] uppercase text-tinta-fraca font-bold tracking-[.1em]; }
+  .rdb-promo .val { @apply font-titulo font-bold text-base text-rdb-700; }
+  .rdb-promo .sub { @apply text-[10.5px] text-tinta-fraca mt-0.5; }
+  .rdb-fees { @apply grid grid-cols-2 gap-2 px-3.5 pt-2.5 pb-3 border-t border-rdb-200 mt-1; }
+  .rdb-fees .rdb-field { @apply m-0; }
+  .rdb-fees .rdb-field label { @apply text-[10.5px]; }
+  .rdb-fees input { @apply text-[12.5px] px-2.5 py-1.5; }
+  .rdb-autobox { @apply col-span-full flex items-center gap-2 text-[11px] font-semibold bg-rdb-50 border border-rdb-200 rounded-[9px] px-2.5 py-2 cursor-pointer; }
+  .rdb-selo { @apply ml-auto text-[9.5px] font-bold px-2 py-1 rounded-full bg-rdb-700 text-limao; }
+  .rdb-selo.err { @apply bg-perigo/10 text-perigo; }
+  .rdb-lib-ctrls { @apply flex gap-2 items-center mb-2.5 flex-wrap; }
+  .rdb-lib-ctrls input { @apply px-3 py-2 text-[13px] border-[1.5px] border-rdb-200 rounded-[10px] min-w-[200px]; }
+  .rdb-btn { @apply font-titulo font-semibold text-[12.5px] rounded-[10px] px-3.5 py-2.5 cursor-pointer border-[1.5px] border-rdb-200 bg-white; }
+  .rdb-btn.prim { @apply bg-rdb-700 border-rdb-700 text-white; }
+  .rdb-libtbl { @apply w-full text-xs; border-collapse: collapse; }
+  .rdb-libtbl th { @apply text-left text-[10px] uppercase text-tinta-fraca px-2.5 py-2 bg-rdb-50 border-b border-rdb-200; }
+  .rdb-libtbl th.r, .rdb-libtbl td.r { @apply text-right; }
+  .rdb-libtbl td { @apply px-2.5 py-2 border-b border-rdb-100; }
+  .rdb-iact { @apply border-[1.5px] border-rdb-200 bg-white rounded-lg px-2 py-1 text-[11px] cursor-pointer ml-1; }
+
   /* ── Misc ── */
   .page-title { @apply text-xl font-bold text-tinta font-titulo; }
   .section-title { @apply text-sm font-semibold text-tinta font-titulo; }

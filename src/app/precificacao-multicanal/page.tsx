@@ -223,67 +223,6 @@ export default function PrecificacaoMulticanalPage() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .rdb { font-family: 'Montserrat', system-ui, sans-serif; background: #F4F7EF; color: #16241C; margin: -24px; padding: 0 0 40px; min-height: 100vh; }
-        .rdb h1, .rdb h2, .rdb h3 { font-family: 'Poppins', sans-serif; }
-        .rdb-header { background: #055E2B; color: #fff; padding: 26px 24px 30px; }
-        .rdb-header .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-        .rdb-header .brand strong { font-family: 'Poppins'; font-weight: 600; font-size: 15px; }
-        .rdb-header .brand small { display: block; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #CDDE35; font-weight: 600; }
-        .rdb-header h1 { font-size: 22px; font-weight: 700; }
-        .rdb-header h1 span { color: #CDDE35; }
-        .rdb-main { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
-        .rdb-toggle { display: flex; gap: 6px; background: #fff; border: 1px solid #DDE7D4; border-radius: 14px; padding: 6px; margin: -20px auto 20px; max-width: 560px; box-shadow: 0 8px 24px rgba(4,43,20,.06); }
-        .rdb-toggle button { flex: 1; border: none; background: transparent; padding: 12px 10px; border-radius: 9px; cursor: pointer; font-family: 'Poppins'; font-weight: 600; font-size: 13px; color: #5C6B60; }
-        .rdb-toggle button.on { background: #055E2B; color: #fff; }
-        .rdb-tol { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: #5C6B60; margin: -8px auto 20px; }
-        .rdb-tol input { width: 56px; font-family: 'Poppins'; font-weight: 600; font-size: 13px; border: 1.5px solid #DDE7D4; border-radius: 8px; padding: 6px 8px; text-align: center; background: #fff; }
-        .rdb-lp-praticado { margin: 10px 14px 0; }
-        .rdb-lp-selo { display: inline-block; margin-top: 6px; }
-        .rdb-card { background: #fff; border: 1px solid #DDE7D4; border-radius: 16px; box-shadow: 0 8px 24px rgba(4,43,20,.06); padding: 16px 20px; margin-bottom: 18px; }
-        .rdb-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
-        .rdb-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
-        .rdb-field input { width: 100%; font-family: 'Poppins'; font-weight: 500; font-size: 14px; color: #16241C; border: 1.5px solid #DDE7D4; border-radius: 10px; padding: 9px 11px; background: #FCFDFB; }
-        .rdb-field input:focus { outline: none; border-color: #055E2B; box-shadow: 0 0 0 3px rgba(5,94,43,.13); }
-        .rdb-grid3 { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; margin-bottom: 14px; }
-        .rdb-grid-metas { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 12px; }
-        .rdb-sugestoes { border: 1px solid #DDE7D4; border-radius: 10px; margin-top: 4px; overflow: hidden; }
-        .rdb-sugestoes button { display: block; width: 100%; text-align: left; padding: 8px 12px; background: #fff; border: none; border-bottom: 1px solid #EEF2E9; cursor: pointer; font-size: 13px; }
-        .rdb-sugestoes button:hover { background: #F7FAF3; }
-        .rdb-chans { display: grid; grid-template-columns: repeat(auto-fit,minmax(270px,1fr)); gap: 16px; margin-top: 4px; }
-        .rdb-chan { background: #fff; border: 1px solid #DDE7D4; border-radius: 16px; box-shadow: 0 8px 24px rgba(4,43,20,.06); overflow: hidden; }
-        .rdb-chan-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 0; }
-        .rdb-chan-ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Poppins'; font-weight: 700; font-size: 11px; }
-        .rdb-chan-nome { font-family: 'Poppins'; font-weight: 600; font-size: 13px; line-height: 1.15; }
-        .rdb-chan-nome span { display: block; font-family: 'Montserrat'; font-weight: 600; font-size: 10px; color: #5C6B60; }
-        .rdb-price { margin: 10px 14px; background: #055E2B; color: #fff; border-radius: 12px; padding: 13px 15px; }
-        .rdb-price.neg { background: #C0392B; }
-        .rdb-price .lb { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #CDDE35; font-weight: 700; }
-        .rdb-price.neg .lb { color: #fff; opacity: .85; }
-        .rdb-price .big { font-family: 'Poppins'; font-weight: 700; font-size: 28px; margin-top: 2px; }
-        .rdb-price .sub { font-size: 11.5px; color: #DCEAD9; margin-top: 2px; }
-        .rdb-price.neg .sub { color: #fff; }
-        .rdb-promo { margin: 0 14px 10px; background: #F7FAF3; border: 1px solid #DDE7D4; border-radius: 10px; padding: 9px 12px; }
-        .rdb-promo .lb { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: #5C6B60; font-weight: 700; }
-        .rdb-promo .val { font-family: 'Poppins'; font-weight: 700; font-size: 16px; color: #055E2B; margin-top: 1px; }
-        .rdb-promo .sub { font-size: 10.5px; color: #5C6B60; margin-top: 2px; }
-        .rdb-fees { padding: 10px 14px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px solid #DDE7D4; margin-top: 4px; }
-        .rdb-fees .rdb-field { margin: 0; }
-        .rdb-fees .rdb-field label { font-size: 10.5px; }
-        .rdb-fees input { font-size: 12.5px; padding: 7px 9px; }
-        .rdb-autobox { grid-column: 1/-1; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; background: #F7FAF3; border: 1px solid #DDE7D4; border-radius: 9px; padding: 7px 9px; cursor: pointer; }
-        .rdb-selo { margin-left: auto; font-size: 9.5px; font-weight: 700; padding: 3px 7px; border-radius: 20px; background: #055E2B; color: #CDDE35; }
-        .rdb-selo.err { background: #FBE6E3; color: #C0392B; }
-        .rdb-lib-ctrls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .rdb-lib-ctrls input { padding: 8px 12px; font-size: 13px; border: 1.5px solid #DDE7D4; border-radius: 10px; min-width: 200px; }
-        .rdb-btn { font-family: 'Poppins'; font-weight: 600; font-size: 12.5px; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1.5px solid #DDE7D4; background: #fff; }
-        .rdb-btn.prim { background: #055E2B; border-color: #055E2B; color: #fff; }
-        .rdb-libtbl { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .rdb-libtbl th { text-align: left; font-size: 10px; text-transform: uppercase; color: #5C6B60; padding: 8px 10px; background: #F7FAF3; border-bottom: 1px solid #DDE7D4; }
-        .rdb-libtbl th.r, .rdb-libtbl td.r { text-align: right; }
-        .rdb-libtbl td { padding: 8px 10px; border-bottom: 1px solid #EEF2E9; }
-        .rdb-iact { border: 1.5px solid #DDE7D4; background: #fff; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-left: 4px; }
-      ` }} />
       <div className="rdb">
         <div className="rdb-header">
           <div className="brand">
@@ -291,7 +230,7 @@ export default function PrecificacaoMulticanalPage() {
             <div><small>Rótulo do Bem</small><strong>Central de Precificação</strong></div>
           </div>
           <h1>O preço ideal de venda em <span>cada canal</span></h1>
-          <a href="/precos-praticados" style={{ display: 'inline-block', marginTop: 10, fontSize: 11.5, color: '#CDDE35', textDecoration: 'underline' }}>
+          <a href="/precos-praticados" className="inline-block mt-2.5 text-[11.5px] text-limao underline">
             Importar preços praticados em massa (Loja Própria) →
           </a>
         </div>
