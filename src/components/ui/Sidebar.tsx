@@ -6,6 +6,7 @@ import {
   ShoppingCart, Upload, Download, Search, ChevronRight,
   Zap, Truck, Settings, Leaf, LogOut, Percent
 } from 'lucide-react'
+import { EVENTO_ABRIR_BUSCA } from '@/components/ui/BuscaGlobal'
 
 const links = [
   { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
@@ -31,23 +32,23 @@ export default function Sidebar() {
 
   if (path === '/parceiro') {
     return (
-      <aside className="w-56 shrink-0 bg-gray-900 min-h-screen flex flex-col">
-        <div className="px-4 py-5 border-b border-gray-800">
+      <aside className="w-56 shrink-0 bg-rdb-900 min-h-screen flex flex-col">
+        <div className="px-4 py-5 border-b border-rdb-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-rdb-700 flex items-center justify-center">
               <Zap size={15} className="text-white" />
             </div>
             <div>
               <p className="text-white font-bold text-sm leading-none">Precify</p>
-              <p className="text-gray-500 text-[10px] mt-0.5">Parceiro</p>
+              <p className="text-rdb-400 text-[10px] mt-0.5">Parceiro</p>
             </div>
           </div>
         </div>
         <div className="flex-1" />
-        <div className="px-2 pb-3 border-t border-gray-800 pt-3">
+        <div className="px-2 pb-3 border-t border-rdb-800 pt-3">
           <button
             onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login' }}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-all w-full text-left"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-rdb-300 hover:bg-rdb-800 hover:text-white transition-all w-full text-left"
           >
             <LogOut size={15} />
             <span>Sair</span>
@@ -58,18 +59,30 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 shrink-0 bg-gray-900 min-h-screen flex flex-col">
+    <aside className="w-56 shrink-0 bg-rdb-900 min-h-screen flex flex-col">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-gray-800">
+      <div className="px-4 py-5 border-b border-rdb-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-rdb-700 flex items-center justify-center">
             <Zap size={15} className="text-white" />
           </div>
           <div>
             <p className="text-white font-bold text-sm leading-none">Precify</p>
-            <p className="text-gray-500 text-[10px] mt-0.5">Marketplace</p>
+            <p className="text-rdb-400 text-[10px] mt-0.5">Marketplace</p>
           </div>
         </div>
+      </div>
+
+      {/* Busca global */}
+      <div className="px-2 pt-3">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_BUSCA))}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm bg-rdb-800/60 text-rdb-300 hover:bg-rdb-800 hover:text-white transition-all"
+        >
+          <Search size={15} className="shrink-0" />
+          <span className="flex-1 text-left">Buscar produto</span>
+          <kbd className="text-[9px] text-rdb-400 border border-rdb-800 rounded px-1 py-0.5">Ctrl K</kbd>
+        </button>
       </div>
 
       {/* Nav */}
@@ -78,7 +91,7 @@ export default function Sidebar() {
           if ('divider' in item && item.divider) {
             return (
               <div key={i} className="pt-3 pb-1 px-3">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{item.label}</p>
+                <p className="text-[10px] font-semibold text-rdb-400 uppercase tracking-wider">{item.label}</p>
               </div>
             )
           }
@@ -87,7 +100,7 @@ export default function Sidebar() {
           return (
             <Link key={href} href={href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all group
-                ${active ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                ${active ? 'bg-rdb-700 text-white' : 'text-rdb-300 hover:bg-rdb-800 hover:text-white'}`}>
               <Icon size={15} className="shrink-0" />
               <span className="flex-1 truncate">{label}</span>
               {active && <ChevronRight size={12} className="opacity-50" />}
@@ -97,15 +110,15 @@ export default function Sidebar() {
       </nav>
 
       {/* Export */}
-      <div className="px-2 pb-3 border-t border-gray-800 pt-3">
+      <div className="px-2 pb-3 border-t border-rdb-800 pt-3">
         <a href="/api/exportar"
-          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-all">
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-rdb-300 hover:bg-rdb-800 hover:text-white transition-all">
           <Download size={15} />
           <span>Exportar XLSX</span>
         </a>
       </div>
       <div className="px-4 pb-3">
-        <p className="text-gray-600 text-[10px]">v2.0 · SQLite · Next.js 14</p>
+        <p className="text-rdb-400 text-[10px]">v2.0 · SQLite · Next.js 14</p>
       </div>
     </aside>
   )
