@@ -110,18 +110,21 @@ export async function GET() {
     .sort((a, b) => b.economia - a.economia)
 
   // ── Produtos com pior margem ─────────────────────────────────
-  const skuMargem: Record<string, { sku: string; produto: string; custoUnit: number; precoVenda: number; margem: number }> = {}
-  for (const c of compras) {
-    if (c.margem !== null && c.precoVenda && c.precoVenda > 0) {
-      if (!skuMargem[c.skuPrincipal] || c.margem < skuMargem[c.skuPrincipal].margem) {
-        skuMargem[c.skuPrincipal] = {
-          sku: c.skuPrincipal,
-          produto: c.nomeProduto,
-          custoUnit: c.custoUnitario,
-          precoVenda: c.precoVenda,
-          margem: c.margem,
-        }
-      }
+  // Usa a compra MAIS RECENTE de cada SKU, não a de pior margem histórica:
+  // o objetivo é mostrar a situação de hoje. Com a pior margem de sempre,
+  // um lançamento errado de meses atrás marcava como prejuízo um produto
+  // que hoje está saudável.
+  const skuMargem: Record<string, { sku: string; produto: string; custoUnit: number; precoVenda: number; margem: number; dataCompra: Date }> = {}
+  for (const c of compras) {   // já vem ordenado por dataCompra desc
+    if (c.margem === null || !c.precoVenda || c.precoVenda <= 0) continue
+    if (skuMargem[c.skuPrincipal]) continue   // a primeira encontrada é a mais recente
+    skuMargem[c.skuPrincipal] = {
+      sku: c.skuPrincipal,
+      produto: c.nomeProduto,
+      custoUnit: c.custoUnitario,
+      precoVenda: c.precoVenda,
+      margem: c.margem,
+      dataCompra: c.dataCompra,
     }
   }
   const prejudizo = Object.values(skuMargem)

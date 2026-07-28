@@ -37,7 +37,7 @@ interface DashCompras {
   ranking20: { sku: string; produto: string; custoAnt: number | null; custoAtual: number; variacaoPct: number | null; status: string; nCompras: number }[]
   volumeMensal: { sku: string; produto: string; mediaMensal: number; totalMeses: number; meses: Record<string, number> }[]
   melhorPreco: { sku: string; produto: string; fornecedores: { nome: string; precoMin: number }[]; melhor: string; economia: number }[]
-  prejudizo: { sku: string; produto: string; custoUnit: number; precoVenda: number; margem: number }[]
+  prejudizo: { sku: string; produto: string; custoUnit: number; precoVenda: number; margem: number; dataCompra: string }[]
 }
 
 interface Fornecedor { id: string; nome: string; contato?: string | null; obs?: string | null }
@@ -551,22 +551,25 @@ function ComprasContent() {
 
           {(dash?.prejudizo ?? []).length > 0 && (
             <div className="card p-4">
-              <h3 className="section-title mb-3 text-red-700 flex items-center gap-1.5">
+              <h3 className="section-title mb-1 text-perigo flex items-center gap-1.5">
                 <AlertTriangle size={14} /> Produtos com margem mais baixa
               </h3>
+              <p className="text-xs text-tinta-fraca mb-3">Pelo custo da compra mais recente de cada produto</p>
               <table className="w-full text-sm">
                 <thead className="tbl-head"><tr>
                   <th className="th">SKU</th><th className="th">Produto</th>
-                  <th className="th-r">Custo</th><th className="th-r">Preço venda</th><th className="th-r">Margem</th>
+                  <th className="th-r">Custo</th><th className="th">Comprado em</th>
+                  <th className="th-r">Preço venda</th><th className="th-r">Margem</th>
                 </tr></thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody>
                   {dash!.prejudizo.slice(0, 10).map(p => (
                     <tr key={p.sku} className="tr-row">
                       <td className="td font-mono text-xs text-rdb-700">{p.sku}</td>
                       <td className="td text-xs">{p.produto}</td>
                       <td className="td-r text-xs">{brl(p.custoUnit)}</td>
+                      <td className="td text-xs text-tinta-fraca">{p.dataCompra ? dt(p.dataCompra) : '—'}</td>
                       <td className="td-r text-xs">{brl(p.precoVenda)}</td>
-                      <td className="td-r text-xs font-bold text-red-600">{pct(p.margem)}</td>
+                      <td className="td-r text-xs font-bold text-perigo">{pct(p.margem)}</td>
                     </tr>
                   ))}
                 </tbody>
