@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { curvaABC } from '@/lib/agregacoes'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -78,31 +79,17 @@ export async function GET(req: NextRequest) {
   if (tipo === 'curva') {
     const meses = parseInt(searchParams.get('meses') || '3')
     const desde = new Date(); desde.setMonth(desde.getMonth() - meses)
-    const compras = await db.compra.findMany({ where: { dataCompra: { gte: desde } }, orderBy: { dataCompra: 'desc' } })
+    const compras = await db.compra.findMany({ where: { dataCompra: { gte: desde } } })
 
-    const porSku: Record<string, { sku: string; produto: string; totalGasto: number; qtdCompras: number; fornecedores: Record<string, number>; ultimoCusto: number }> = {}
-    for (const c of compras) {
-      if (!porSku[c.skuPrincipal]) porSku[c.skuPrincipal] = { sku: c.skuPrincipal, produto: c.nomeProduto, totalGasto: 0, qtdCompras: 0, fornecedores: {}, ultimoCusto: c.custoUnitario }
-      porSku[c.skuPrincipal].totalGasto += c.custoTotal
-      porSku[c.skuPrincipal].qtdCompras += 1
-      if (c.fornecedor) porSku[c.skuPrincipal].fornecedores[c.fornecedor] = (porSku[c.skuPrincipal].fornecedores[c.fornecedor] || 0) + c.custoTotal
-    }
-    const lista = Object.values(porSku).sort((a, b) => b.totalGasto - a.totalGasto)
-    const totalGeral = lista.reduce((s, i) => s + i.totalGasto, 0)
-    let acumulado = 0
-    const resultado = lista.map(item => {
-      const pct = totalGeral > 0 ? item.totalGasto / totalGeral : 0
-      acumulado += pct
-      const curva = acumulado <= 0.80 ? 'A' : acumulado <= 0.95 ? 'B' : 'C'
-      const fornOrd = Object.entries(item.fornecedores).sort((a, b) => b[1] - a[1])
-      return {
-        sku: item.sku, produto: item.produto, curva, totalGasto: item.totalGasto, qtdCompras: item.qtdCompras,
-        pctTotal: Math.round(pct * 1000) / 10,
-        fornecedorPrincipal: fornOrd[0]?.[0] || '',
-        outrosFornecedores: fornOrd.slice(1).map(([f]) => f),
-        mediaGastoMes: Math.round((item.totalGasto / meses) * 100) / 100,
-      }
-    })
+    const itens = curvaABC(compras)
+    const totalGeral = itens.reduce((s, i) => s + i.totalGasto, 0)
+    const resultado = itens.map(i => ({
+      sku: i.sku, produto: i.produto, curva: i.curva,
+      totalGasto: i.totalGasto, qtdCompras: i.qtdCompras, pctTotal: i.pctTotal,
+      fornecedorPrincipal: i.fornecedorPrincipal,
+      outrosFornecedores: i.outrosFornecedores,
+      mediaGastoMes: Math.round((i.totalGasto / meses) * 100) / 100,
+    }))
     return NextResponse.json({
       periodo: `${meses} meses`, totalGeral: Math.round(totalGeral * 100) / 100,
       qtdA: resultado.filter(r => r.curva === 'A').length,

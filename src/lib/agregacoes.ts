@@ -44,6 +44,17 @@ export function serieMensalDeGastos(compras: CompraAgregavel[], meses: number, r
   return serie
 }
 
+/**
+ * Remove os meses zerados do **início** da série — eles significam "ainda não
+ * havia registro", não "não se gastou nada", e num gráfico de área dariam a
+ * impressão falsa de um salto no gasto. Buracos no meio são preservados,
+ * porque ali o zero é informação de verdade.
+ */
+export function aparaMesesVazios(serie: PontoMensal[]): PontoMensal[] {
+  const primeiro = serie.findIndex(p => p.compras > 0)
+  return primeiro <= 0 ? serie : serie.slice(primeiro)
+}
+
 export interface DistribuicaoMargem {
   saudavel: number
   atencao: number
@@ -136,10 +147,14 @@ export function curvaABC(compras: CompraAgregavel[]): ItemCurva[] {
     const curva: 'A' | 'B' | 'C' =
       acumulado <= 0.80 + EPSILON ? 'A' : acumulado <= 0.95 + EPSILON ? 'B' : 'C'
 
-    const porGasto = [...acc.gastoPorFornecedor.entries()].sort((a, b) => b[1] - a[1])
+    // Desempate por nome mantém o resultado estável quando dois fornecedores
+    // têm exatamente o mesmo gasto (ou o mesmo custo médio) — sem isso a
+    // escolha dependeria da ordem em que o banco devolveu as linhas.
+    const porGasto = [...acc.gastoPorFornecedor.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     const medias = [...acc.somaCustoPorFornecedor.entries()]
       .map(([nome, m]) => ({ nome, custoUnitario: arredonda2(m.soma / m.n) }))
-      .sort((a, b) => a.custoUnitario - b.custoUnitario)
+      .sort((a, b) => a.custoUnitario - b.custoUnitario || a.nome.localeCompare(b.nome))
 
     const cronologico = acc.porData.sort((a, b) => a.data - b.data).map(p => p.custoUnitario)
     const historicoCusto = cronologico.slice(-MAX_PONTOS_HISTORICO)

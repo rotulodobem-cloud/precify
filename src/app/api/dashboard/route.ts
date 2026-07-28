@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { CANAIS_MULTICANAL, calcularCanalModoPreco } from '@/lib/calculosMulticanal'
+import { serieMensalDeGastos, aparaMesesVazios, distribuirMargens, curvaABC } from '@/lib/agregacoes'
 
 const DIAS_PARADO = 60
 const TOLERANCIA_PADRAO = 10
@@ -26,6 +27,24 @@ export async function GET(req: NextRequest) {
   const fornecedores = [...porFornecedor.entries()]
     .map(([fornecedor, total]) => ({ fornecedor, total: Math.round(total * 100) / 100 }))
     .sort((a, b) => b.total - a.total)
+
+  // Variação do gasto de cada fornecedor contra o mês anterior
+  const inicioAnterior = new Date(ano, mesNum - 2, 1)
+  const fimAnterior = new Date(ano, mesNum - 1, 0, 23, 59, 59)
+  const comprasAnterior = await db.compra.findMany({
+    where: { ...whereCompras, dataCompra: { gte: inicioAnterior, lte: fimAnterior } },
+  })
+  const totalAnteriorPorFornecedor = new Map<string, number>()
+  for (const c of comprasAnterior) {
+    totalAnteriorPorFornecedor.set(c.fornecedor, (totalAnteriorPorFornecedor.get(c.fornecedor) ?? 0) + c.custoTotal)
+  }
+  const fornecedoresComVariacao = fornecedores.map(f => {
+    const anterior = totalAnteriorPorFornecedor.get(f.fornecedor)
+    return {
+      ...f,
+      variacaoPct: anterior && anterior > 0 ? Math.round(((f.total - anterior) / anterior) * 1000) / 10 : null,
+    }
+  })
 
   const tolConfig = await db.configuracao.findUnique({ where: { chave: 'tolerancia_loja_propria_pct' } })
   const tolerancia = tolConfig ? parseFloat(tolConfig.valor) : TOLERANCIA_PADRAO
@@ -142,10 +161,30 @@ export async function GET(req: NextRequest) {
     take: 30,
   })
 
+  // Série de 12 meses terminando no mês selecionado. Ignora o filtro de
+  // fornecedor de propósito: a leitura aqui é de tendência geral do gasto.
+  const inicioSerie = new Date(ano, mesNum - 12, 1)
+  const comprasSerie = await db.compra.findMany({
+    where: { dataCompra: { gte: inicioSerie, lte: fim } },
+    select: { dataCompra: true, skuPrincipal: true, nomeProduto: true, fornecedor: true, custoTotal: true, custoUnitario: true },
+  })
+  const serieMensal = aparaMesesVazios(serieMensalDeGastos(comprasSerie, 12, new Date(ano, mesNum - 1, 1)))
+
+  // Distribuição das margens: reaproveita as margens já calculadas para porCategoria
+  const distribuicaoMargens = distribuirMargens([...margensPorCategoria.values()].flat())
+
+  // Curva A dos últimos 6 meses — os produtos que concentram o gasto
+  const inicioCurva = new Date(ano, mesNum - 6, 1)
+  const curvaA = curvaABC(comprasSerie.filter(c => c.dataCompra >= inicioCurva))
+    .filter(i => i.curva === 'A')
+    .slice(0, 8)
+
   return NextResponse.json({
     mes, fornecedorFiltro: fornecedorFiltro ?? null,
     gastoTotal: Math.round(gastoTotal * 100) / 100,
     totalCompras: compras.length,
-    fornecedores, produtosPraAjustar, porCategoria, produtosParados,
+    fornecedores: fornecedoresComVariacao,
+    produtosPraAjustar, porCategoria, produtosParados,
+    serieMensal, distribuicaoMargens, curvaA,
   })
 }
