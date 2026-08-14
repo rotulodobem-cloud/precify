@@ -6,6 +6,12 @@ import { useDebounce } from '@/lib/useDebounce'
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pctf = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
 
+// Preço p/ anunciar = preço ideal × PROMO_MARKUP. Pra promoção da plataforma devolver
+// exatamente o preço ideal, o desconto tem que ser 1 − 1/PROMO_MARKUP (≈28,6%), não os
+// mesmos 40% do markup — são operações inversas, com percentuais diferentes.
+const PROMO_MARKUP = 1.4
+const PROMO_DESCONTO_PCT = (1 - 1 / PROMO_MARKUP) * 100
+
 interface VariacaoBusca { skuVariacao: string; nomeVariacao: string; pesoGramas: number | null; custoTotal: number | null; custoCalculado: number | null }
 interface ProdutoBusca { skuPrincipal: string; nome: string; custoAtualizado: number | null; variacoes: VariacaoBusca[] }
 
@@ -43,6 +49,7 @@ export default function PrecificacaoMulticanalPage() {
   const [canais, setCanais] = useState<CanaisState>(canaisIniciais())
   const [autoStates, setAutoStates] = useState<Record<string, boolean>>({ sh: true, tt: true })
   const [canaisAtivos, setCanaisAtivos] = useState<Record<string, boolean>>({})
+  const [detalheAberto, setDetalheAberto] = useState<Record<string, boolean>>({})
 
   // Biblioteca
   const [biblioteca, setBiblioteca] = useState<any[]>([])
@@ -369,11 +376,40 @@ export default function PrecificacaoMulticanalPage() {
                     </div>
                   )}
 
+                  {r && (
+                    <>
+                      <button type="button" className="rdb-detalhe-toggle"
+                        onClick={() => setDetalheAberto(s => ({ ...s, [def.key]: !s[def.key] }))}>
+                        {detalheAberto[def.key] ? 'Ocultar' : 'Ver'} detalhamento das taxas aplicadas
+                      </button>
+                      {detalheAberto[def.key] && (
+                        <div className="rdb-detalhe">
+                          <div className="rdb-detalhe-row"><span className="k">Preço de venda</span><span className="v">{brl(r.preco)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Custo do produto + embalagem</span><span className="v">{brl(r.custoBase)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Comissão da plataforma ({pctf(r.comEfetivo)})</span><span className="v">{brl(r.comR)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Outras taxas ({pctf(cfg.out)})</span><span className="v">{brl(r.outR)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Taxa fixa da plataforma</span><span className="v">{brl(r.fix)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Frete</span><span className="v">{brl(r.frete)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Despesas variáveis gerais ({pctf(despVarPct)})</span><span className="v">{brl(r.despVarR)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">(−) Despesas fixas rateio ({pctf(despFixPct)})</span><span className="v">{brl(r.despFixR)}</span></div>
+                          <div className="rdb-detalhe-row total"><span className="k">(=) Lucro</span><span className="v">{brl(r.lucro)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">Margem real</span><span className="v">{pctf(r.margem * 100)}</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">Markup</span><span className="v">{r.markup.toFixed(2)}×</span></div>
+                          <div className="rdb-detalhe-row"><span className="k">Preço mínimo (empate)</span><span className="v">{brl(r.precoMinimo)}</span></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {r && def.key !== 'lp' && (
                     <div className="rdb-promo">
                       <div className="lb">Preço p/ anunciar (+40%)</div>
-                      <div className="val">{brl(r.preco * 1.4)}</div>
-                      <div className="sub">suba o produto por esse valor e depois promocione até {brl(r.preco)}</div>
+                      <div className="val">{brl(r.preco * PROMO_MARKUP)}</div>
+                      <div className="sub">
+                        Suba o produto por esse valor. Na promoção da plataforma, aplique <strong>{pctf(PROMO_DESCONTO_PCT)}</strong> de
+                        desconto — isso leva exatamente a {brl(r.preco)} (o preço ideal). Se a plataforma só aceitar % inteiro,
+                        arredonde pra baixo (ex: 28%, nunca 29%) pra não vender abaixo do ideal.
+                      </div>
                     </div>
                   )}
 

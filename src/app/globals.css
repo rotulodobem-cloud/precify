@@ -92,6 +92,13 @@
   .rdb-promo .lb { @apply text-[9.5px] uppercase text-tinta-fraca font-bold tracking-[.1em]; }
   .rdb-promo .val { @apply font-titulo font-bold text-base text-rdb-700; }
   .rdb-promo .sub { @apply text-[10.5px] text-tinta-fraca mt-0.5; }
+  .rdb-detalhe-toggle { @apply block mx-3.5 mb-2 text-[11px] font-semibold text-rdb-700 bg-transparent border-0 cursor-pointer underline p-0; }
+  .rdb-detalhe { @apply mx-3.5 mb-2.5 bg-rdb-50 border border-rdb-200 rounded-[10px] px-3 py-2.5; }
+  .rdb-detalhe-row { @apply flex justify-between gap-2 py-[3px] text-[11.5px]; }
+  .rdb-detalhe-row.total { @apply border-t border-rdb-200 mt-1 pt-1.5; }
+  .rdb-detalhe-row .k { @apply text-tinta-fraca; }
+  .rdb-detalhe-row .v { @apply font-titulo font-semibold text-tinta shrink-0; }
+  .rdb-detalhe-row.total .k, .rdb-detalhe-row.total .v { @apply font-bold text-tinta; }
   .rdb-fees { @apply grid grid-cols-2 gap-2 px-3.5 pt-2.5 pb-3 border-t border-rdb-200 mt-1; }
   .rdb-fees .rdb-field { @apply m-0; }
   .rdb-fees .rdb-field label { @apply text-[10.5px]; }
