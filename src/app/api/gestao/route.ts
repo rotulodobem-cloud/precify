@@ -64,9 +64,12 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: CORS_HEADERS })
 }
 
+// tipos que só a chave de escopo "financeiro" pode consultar (dado sensível: fornecedor, NF, faturamento, imposto)
+const TIPOS_SO_FINANCEIRO = ['compras', 'faturamento', 'imposto', 'resumo']
+
 export async function GET(req: NextRequest) {
-  const chaveValida = await validarChaveApi(req.headers.get('x-api-key'))
-  if (!chaveValida) {
+  const escopo = await validarChaveApi(req.headers.get('x-api-key'))
+  if (!escopo) {
     return NextResponse.json({ ok: false, error: 'Chave de API ausente ou inválida' }, { status: 401, headers: CORS_HEADERS })
   }
 
@@ -74,6 +77,13 @@ export async function GET(req: NextRequest) {
   const tipo = searchParams.get('tipo')
   const sku = searchParams.get('sku')
   const mes = searchParams.get('mes') // formato: 2026-05
+
+  if (tipo && TIPOS_SO_FINANCEIRO.includes(tipo) && escopo !== 'financeiro') {
+    return NextResponse.json(
+      { ok: false, error: `Essa chave não tem acesso a "${tipo}". Gere uma chave de escopo "Financeiro completo" em /chaves-api.` },
+      { status: 403, headers: CORS_HEADERS },
+    )
+  }
 
   try {
     // ── 1. CATÁLOGO COMPLETO DE PRODUTOS ──────────────────────────────────
@@ -149,7 +159,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, data: produtoResposta }, { headers: CORS_HEADERS })
     }
 
-    // ── 3. FATURAMENTO DIÁRIO POR MÊS ─────────────────────────────────────
+    // ── 3. COMPRAS (custo pago, pra cálculo de CMV) ───────────────────────
+    if (tipo === 'compras') {
+      const anoMes = mes || new Date().toISOString().substring(0, 7)
+      const [ano, mesNum] = anoMes.split('-').map(Number)
+      const inicio = new Date(ano, mesNum - 1, 1)
+      const fim = new Date(ano, mesNum, 0, 23, 59, 59)
+
+      const compras = await db.compra.findMany({
+        where: {
+          dataCompra: { gte: inicio, lte: fim },
+          ...(sku ? { skuPrincipal: { contains: sku, mode: 'insensitive' } } : {}),
+        },
+        orderBy: { dataCompra: 'asc' },
+        select: {
+          dataCompra: true, skuPrincipal: true, nomeProduto: true, fornecedor: true,
+          quantidade: true, custoUnitario: true, custoTotal: true, frete: true, outrosCustos: true,
+          impostoPct: true, margem: true, statusFinanceiro: true, numeroNF: true, numeroPedido: true,
+        },
+      })
+
+      return NextResponse.json({ ok: true, data: { mes: anoMes, compras } }, { headers: CORS_HEADERS })
+    }
+
+    // ── 4. FATURAMENTO DIÁRIO POR MÊS ─────────────────────────────────────
     if (tipo === 'faturamento') {
       const anoMes = mes || new Date().toISOString().substring(0, 7)
       const [ano, mesNum] = anoMes.split('-').map(Number)
@@ -186,7 +219,7 @@ export async function GET(req: NextRequest) {
       }, { headers: CORS_HEADERS })
     }
 
-    // ── 4. PLATAFORMAS E TAXAS ────────────────────────────────────────────
+    // ── 5. PLATAFORMAS E TAXAS ────────────────────────────────────────────
     if (tipo === 'plataformas') {
       const plataformas = CANAIS_MULTICANAL.map(def => ({
         slug: SLUG_EXTERNO[def.key], nome: NOME_EXTERNO[def.key],
@@ -195,7 +228,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, data: plataformas }, { headers: CORS_HEADERS })
     }
 
-    // ── 5. ALÍQUOTA E CONFIGURAÇÕES ───────────────────────────────────────
+    // ── 6. ALÍQUOTA E CONFIGURAÇÕES ───────────────────────────────────────
     if (tipo === 'imposto') {
       const mesAtual = new Date().toISOString().substring(0, 7).replace('-', '_')
       const chaves = [
@@ -230,7 +263,7 @@ export async function GET(req: NextRequest) {
       }, { headers: CORS_HEADERS })
     }
 
-    // ── 6. RESUMO DO DASHBOARD ────────────────────────────────────────────
+    // ── 7. RESUMO DO DASHBOARD ────────────────────────────────────────────
     if (tipo === 'resumo') {
       const mesAtual = new Date().toISOString().substring(0, 7)
       const [ano, mesNum] = mesAtual.split('-').map(Number)
@@ -267,7 +300,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: false, error: 'Parâmetro tipo inválido. Use: produtos, produto, faturamento, plataformas, imposto, resumo' },
+      { ok: false, error: 'Parâmetro tipo inválido. Use: produtos, produto, compras, faturamento, plataformas, imposto, resumo' },
       { status: 400, headers: CORS_HEADERS }
     )
 

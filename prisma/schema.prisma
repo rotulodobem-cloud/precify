@@ -227,6 +227,9 @@ model ApiKey {
   nome        String    // identifica o sistema externo, ex: "Sistema de Gestão Financeira"
   chaveHash   String    @unique // sha256 da chave real -- a chave em texto puro nunca é gravada
   chavePrefixo String   // primeiros caracteres da chave, só pra reconhecer qual é qual na listagem
+  // "produtos": só custo atual + margem/preço mínimo por canal (ex: ferramenta de campanha).
+  // "financeiro": tudo isso + compras (fornecedor, NF), faturamento e imposto.
+  escopo      String    @default("produtos")
   ativa       Boolean   @default(true)
   ultimoUsoEm DateTime?
   createdAt   DateTime  @default(now())

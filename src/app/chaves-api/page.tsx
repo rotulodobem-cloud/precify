@@ -6,6 +6,7 @@ interface ChaveApi {
   id: string
   nome: string
   chavePrefixo: string
+  escopo: 'produtos' | 'financeiro'
   ativa: boolean
   ultimoUsoEm: string | null
   createdAt: string
@@ -13,9 +14,15 @@ interface ChaveApi {
 
 const fmtData = (v: string | null) => v ? new Date(v).toLocaleString('pt-BR') : 'nunca usada'
 
+const ESCOPOS = {
+  produtos: { label: 'Produtos', desc: 'só custo atual e margem/preço mínimo por canal' },
+  financeiro: { label: 'Financeiro completo', desc: 'produtos + compras (fornecedor, NF), faturamento e imposto' },
+} as const
+
 export default function ChavesApiPage() {
   const [chaves, setChaves] = useState<ChaveApi[]>([])
   const [nome, setNome] = useState('')
+  const [escopo, setEscopo] = useState<'produtos' | 'financeiro'>('produtos')
   const [criando, setCriando] = useState(false)
   const [chaveGerada, setChaveGerada] = useState<{ nome: string; chave: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
@@ -29,7 +36,7 @@ export default function ChavesApiPage() {
     setCriando(true)
     setErro('')
     const r = await fetch('/api/chaves-api', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, escopo }),
     })
     const d = await r.json()
     setCriando(false)
@@ -79,17 +86,25 @@ export default function ChavesApiPage() {
         </div>
       )}
 
-      <div className="flex items-end gap-2 mb-6">
+      <div className="flex items-end gap-2 mb-2">
         <div className="flex-1">
           <label className="block text-xs font-semibold mb-1.5">Nome do sistema que vai usar a chave</label>
           <input value={nome} onChange={e => setNome(e.target.value)} placeholder="ex: Sistema de Gestão Financeira"
             className="w-full border-[1.5px] border-rdb-200 rounded-[10px] px-3 py-2.5 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold mb-1.5">O que esse sistema pode ver</label>
+          <select value={escopo} onChange={e => setEscopo(e.target.value as 'produtos' | 'financeiro')}
+            className="border-[1.5px] border-rdb-200 rounded-[10px] px-3 py-2.5 text-sm bg-white">
+            {Object.entries(ESCOPOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
         </div>
         <button onClick={criar} disabled={criando}
           className="bg-rdb-700 text-white font-semibold text-sm rounded-[10px] px-4 py-2.5 disabled:opacity-60">
           {criando ? 'Gerando…' : 'Gerar chave'}
         </button>
       </div>
+      <p className="text-[11px] text-tinta-fraca mb-4">{ESCOPOS[escopo].desc}</p>
       {erro && <p className="text-sm text-perigo mb-4">{erro}</p>}
 
       <div className="border border-rdb-200 rounded-xl overflow-hidden">
@@ -98,6 +113,7 @@ export default function ChavesApiPage() {
             <tr className="bg-rdb-50 text-left text-xs uppercase text-tinta-fraca">
               <th className="px-3 py-2">Sistema</th>
               <th className="px-3 py-2">Chave</th>
+              <th className="px-3 py-2">Acesso</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Último uso</th>
               <th className="px-3 py-2"></th>
@@ -105,12 +121,13 @@ export default function ChavesApiPage() {
           </thead>
           <tbody>
             {chaves.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-6 text-tinta-fraca">Nenhuma chave criada ainda.</td></tr>
+              <tr><td colSpan={6} className="text-center py-6 text-tinta-fraca">Nenhuma chave criada ainda.</td></tr>
             )}
             {chaves.map(c => (
               <tr key={c.id} className="border-t border-rdb-100">
                 <td className="px-3 py-2 font-medium">{c.nome}</td>
                 <td className="px-3 py-2 font-mono text-xs text-tinta-fraca">{c.chavePrefixo}</td>
+                <td className="px-3 py-2 text-tinta-fraca">{ESCOPOS[c.escopo]?.label ?? c.escopo}</td>
                 <td className="px-3 py-2">
                   {c.ativa
                     ? <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-rdb-700 text-limao">ativa</span>

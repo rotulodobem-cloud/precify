@@ -16,11 +16,13 @@ export function prefixoVisivel(chave: string): string {
   return chave.slice(0, PREFIXO.length + 6) + '…'
 }
 
-/** Confere uma chave recebida via header contra as chaves ativas no banco. */
-export async function validarChaveApi(chave: string | null): Promise<boolean> {
-  if (!chave) return false
+export type EscopoChaveApi = 'produtos' | 'financeiro'
+
+/** Confere uma chave recebida via header contra as chaves ativas no banco e devolve o escopo dela. */
+export async function validarChaveApi(chave: string | null): Promise<EscopoChaveApi | null> {
+  if (!chave) return null
   const registro = await db.apiKey.findUnique({ where: { chaveHash: hashChaveApi(chave) } })
-  if (!registro || !registro.ativa) return false
+  if (!registro || !registro.ativa) return null
   db.apiKey.update({ where: { id: registro.id }, data: { ultimoUsoEm: new Date() } }).catch(() => {})
-  return true
+  return registro.escopo === 'financeiro' ? 'financeiro' : 'produtos'
 }
