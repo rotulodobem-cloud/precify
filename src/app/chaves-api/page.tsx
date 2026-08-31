@@ -7,6 +7,7 @@ interface ChaveApi {
   nome: string
   chavePrefixo: string
   escopo: 'produtos' | 'financeiro'
+  canais: string[]
   ativa: boolean
   ultimoUsoEm: string | null
   createdAt: string
@@ -19,10 +20,22 @@ const ESCOPOS = {
   financeiro: { label: 'Financeiro completo', desc: 'produtos + compras (fornecedor, NF), faturamento e imposto' },
 } as const
 
+const CANAIS = [
+  { slug: 'loja_propria', label: 'Loja Própria' },
+  { slug: 'ml_full', label: 'ML Full' },
+  { slug: 'ml_classico', label: 'ML Clássico' },
+  { slug: 'shopee', label: 'Shopee' },
+  { slug: 'tiktok', label: 'TikTok' },
+] as const
+
+const fmtCanais = (canais: string[]) =>
+  canais.length === 0 ? 'todos os canais' : canais.map(c => CANAIS.find(x => x.slug === c)?.label ?? c).join(', ')
+
 export default function ChavesApiPage() {
   const [chaves, setChaves] = useState<ChaveApi[]>([])
   const [nome, setNome] = useState('')
   const [escopo, setEscopo] = useState<'produtos' | 'financeiro'>('produtos')
+  const [canais, setCanais] = useState<string[]>(CANAIS.map(c => c.slug))
   const [criando, setCriando] = useState(false)
   const [chaveGerada, setChaveGerada] = useState<{ nome: string; chave: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
@@ -35,15 +48,22 @@ export default function ChavesApiPage() {
     if (!nome.trim()) { setErro('Informe um nome pra identificar o sistema.'); return }
     setCriando(true)
     setErro('')
+    const todosCanais = canais.length === CANAIS.length
     const r = await fetch('/api/chaves-api', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, escopo }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome, escopo, canais: todosCanais ? [] : canais }),
     })
     const d = await r.json()
     setCriando(false)
     if (!r.ok) { setErro(d.error ?? 'Erro ao criar chave'); return }
     setChaveGerada({ nome: d.nome, chave: d.chave })
     setNome('')
+    setCanais(CANAIS.map(c => c.slug))
     carregar()
+  }
+
+  const alternarCanal = (slug: string) => {
+    setCanais(prev => prev.includes(slug) ? prev.filter(c => c !== slug) : [...prev, slug])
   }
 
   const revogar = async (id: string, nomeChave: string) => {
@@ -104,7 +124,19 @@ export default function ChavesApiPage() {
           {criando ? 'Gerando…' : 'Gerar chave'}
         </button>
       </div>
-      <p className="text-[11px] text-tinta-fraca mb-4">{ESCOPOS[escopo].desc}</p>
+      <p className="text-[11px] text-tinta-fraca mb-3">{ESCOPOS[escopo].desc}</p>
+
+      <div className="mb-4">
+        <label className="block text-xs font-semibold mb-1.5">Canais que esse sistema pode ver (produtos/margem)</label>
+        <div className="flex flex-wrap gap-3">
+          {CANAIS.map(c => (
+            <label key={c.slug} className="flex items-center gap-1.5 text-xs">
+              <input type="checkbox" checked={canais.includes(c.slug)} onChange={() => alternarCanal(c.slug)} />
+              {c.label}
+            </label>
+          ))}
+        </div>
+      </div>
       {erro && <p className="text-sm text-perigo mb-4">{erro}</p>}
 
       <div className="border border-rdb-200 rounded-xl overflow-hidden">
@@ -114,6 +146,7 @@ export default function ChavesApiPage() {
               <th className="px-3 py-2">Sistema</th>
               <th className="px-3 py-2">Chave</th>
               <th className="px-3 py-2">Acesso</th>
+              <th className="px-3 py-2">Canais</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Último uso</th>
               <th className="px-3 py-2"></th>
@@ -121,13 +154,14 @@ export default function ChavesApiPage() {
           </thead>
           <tbody>
             {chaves.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-6 text-tinta-fraca">Nenhuma chave criada ainda.</td></tr>
+              <tr><td colSpan={7} className="text-center py-6 text-tinta-fraca">Nenhuma chave criada ainda.</td></tr>
             )}
             {chaves.map(c => (
               <tr key={c.id} className="border-t border-rdb-100">
                 <td className="px-3 py-2 font-medium">{c.nome}</td>
                 <td className="px-3 py-2 font-mono text-xs text-tinta-fraca">{c.chavePrefixo}</td>
                 <td className="px-3 py-2 text-tinta-fraca">{ESCOPOS[c.escopo]?.label ?? c.escopo}</td>
+                <td className="px-3 py-2 text-tinta-fraca text-xs">{fmtCanais(c.canais)}</td>
                 <td className="px-3 py-2">
                   {c.ativa
                     ? <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-rdb-700 text-limao">ativa</span>

@@ -230,6 +230,9 @@ model ApiKey {
   // "produtos": só custo atual + margem/preço mínimo por canal (ex: ferramenta de campanha).
   // "financeiro": tudo isso + compras (fornecedor, NF), faturamento e imposto.
   escopo      String    @default("produtos")
+  // slugs dos canais que essa chave pode ver em tipo=produtos/produto (loja_propria,
+  // ml_full, ml_classico, shopee, tiktok) -- lista vazia = todos os canais.
+  canais      String[]  @default([])
   ativa       Boolean   @default(true)
   ultimoUsoEm DateTime?
   createdAt   DateTime  @default(now())

@@ -18,11 +18,17 @@ export function prefixoVisivel(chave: string): string {
 
 export type EscopoChaveApi = 'produtos' | 'financeiro'
 
-/** Confere uma chave recebida via header contra as chaves ativas no banco e devolve o escopo dela. */
-export async function validarChaveApi(chave: string | null): Promise<EscopoChaveApi | null> {
+export interface ChaveApiValidada {
+  escopo: EscopoChaveApi
+  /** slugs de canal permitidos (loja_propria, ml_full, ml_classico, shopee, tiktok); [] = todos */
+  canais: string[]
+}
+
+/** Confere uma chave recebida via header contra as chaves ativas no banco e devolve escopo + canais permitidos. */
+export async function validarChaveApi(chave: string | null): Promise<ChaveApiValidada | null> {
   if (!chave) return null
   const registro = await db.apiKey.findUnique({ where: { chaveHash: hashChaveApi(chave) } })
   if (!registro || !registro.ativa) return null
   db.apiKey.update({ where: { id: registro.id }, data: { ultimoUsoEm: new Date() } }).catch(() => {})
-  return registro.escopo === 'financeiro' ? 'financeiro' : 'produtos'
+  return { escopo: registro.escopo === 'financeiro' ? 'financeiro' : 'produtos', canais: registro.canais }
 }

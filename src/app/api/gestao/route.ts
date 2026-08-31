@@ -28,12 +28,13 @@ function montarAnuncios(c: {
   custoProduto: number; pesoGramas: number | null
   despesasVariaveisPct: number; despesasFixasPct: number
   canais: unknown; canaisAtivos: unknown
-}) {
+}, canaisPermitidos: string[]) {
   const ativos = (c.canaisAtivos ?? {}) as Record<string, boolean>
   const canaisCfg = (c.canais ?? {}) as Record<string, Record<string, number>>
   const anuncios: Record<string, unknown>[] = []
 
   for (const key of CANAIS_EXTERNOS) {
+    if (canaisPermitidos.length > 0 && !canaisPermitidos.includes(SLUG_EXTERNO[key])) continue
     if (key !== 'lp' && !ativos[key]) continue
     const def = CANAIS_MULTICANAL.find(d => d.key === key)
     const cfg = canaisCfg[key] ?? def?.default
@@ -68,10 +69,11 @@ export async function OPTIONS() {
 const TIPOS_SO_FINANCEIRO = ['compras', 'faturamento', 'imposto', 'resumo']
 
 export async function GET(req: NextRequest) {
-  const escopo = await validarChaveApi(req.headers.get('x-api-key'))
-  if (!escopo) {
+  const chaveInfo = await validarChaveApi(req.headers.get('x-api-key'))
+  if (!chaveInfo) {
     return NextResponse.json({ ok: false, error: 'Chave de API ausente ou inválida' }, { status: 401, headers: CORS_HEADERS })
   }
+  const { escopo, canais: canaisPermitidos } = chaveInfo
 
   const { searchParams } = new URL(req.url)
   const tipo = searchParams.get('tipo')
@@ -114,7 +116,7 @@ export async function GET(req: NextRequest) {
         ...produto,
         variacoes: produto.variacoes.map(variacao => {
           const calc = porSkuVariacao.get(variacao.skuVariacao)
-          return { ...variacao, anuncios: calc ? montarAnuncios(calc) : [] }
+          return { ...variacao, anuncios: calc ? montarAnuncios(calc, canaisPermitidos) : [] }
         }),
       }))
 
@@ -152,7 +154,7 @@ export async function GET(req: NextRequest) {
         ...produto,
         variacoes: produto.variacoes.map(variacao => {
           const calc = porSkuVariacao.get(variacao.skuVariacao)
-          return { ...variacao, anuncios: calc ? montarAnuncios(calc) : [] }
+          return { ...variacao, anuncios: calc ? montarAnuncios(calc, canaisPermitidos) : [] }
         }),
       }
 
