@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
   const isPublic = pathname === '/login'
     || pathname === '/api/auth/login'
     || pathname === '/api/auth/logout'
-    || pathname === '/api/gestao'
+    || pathname === '/api/gestao' // API pública -- autenticada por chave própria, não por cookie (ver route.ts)
 
   if (isPublic) return NextResponse.next()
 

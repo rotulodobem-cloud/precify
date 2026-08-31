@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { CANAIS_MULTICANAL, calcularCanalModoPreco } from '@/lib/calculosMulticanal'
 import { statusMargem } from '@/lib/calculos'
+import { validarChaveApi } from '@/lib/apiKeys'
 
-// Permite chamadas do sistema de gestão financeira (arquivo HTML local)
+// API pública para sistemas externos (ex: gestão financeira). Sem cookie de
+// login -- em vez disso, exige uma chave própria por sistema (ver /chaves-api).
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
 }
 
 const CANAIS_EXTERNOS = ['lp', 'mlFull', 'mlClassico', 'sh', 'tt']
@@ -63,6 +65,11 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: NextRequest) {
+  const chaveValida = await validarChaveApi(req.headers.get('x-api-key'))
+  if (!chaveValida) {
+    return NextResponse.json({ ok: false, error: 'Chave de API ausente ou inválida' }, { status: 401, headers: CORS_HEADERS })
+  }
+
   const { searchParams } = new URL(req.url)
   const tipo = searchParams.get('tipo')
   const sku = searchParams.get('sku')

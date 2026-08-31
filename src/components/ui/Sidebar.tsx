@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
-  Zap, Truck, Settings, Leaf, LogOut, Percent, Handshake
+  Zap, Truck, Settings, Leaf, LogOut, Percent, Handshake, KeyRound
 } from 'lucide-react'
 import { EVENTO_ABRIR_BUSCA } from '@/components/ui/BuscaGlobal'
 import type { Role } from '@/lib/auth'
@@ -26,6 +26,7 @@ const links = [
   { href: '/lotes',          label: 'Lotes',           icon: Tag },
   { href: '/importar',       label: 'Importar XLSX',   icon: Upload },
   { href: '/parceiro',       label: 'Tela do parceiro', icon: Handshake },
+  { href: '/chaves-api',     label: 'Chaves de API',   icon: KeyRound },
   { href: '/configuracoes',  label: 'Configurações',   icon: Settings },
 ]
 

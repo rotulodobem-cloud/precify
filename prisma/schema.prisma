@@ -221,6 +221,17 @@ model PedidoItem {
   createdAt        DateTime @default(now())
 }
 
+// ─── CHAVES DE API (acesso externo à API pública) ─────────────
+model ApiKey {
+  id          String    @id @default(cuid())
+  nome        String    // identifica o sistema externo, ex: "Sistema de Gestão Financeira"
+  chaveHash   String    @unique // sha256 da chave real -- a chave em texto puro nunca é gravada
+  chavePrefixo String   // primeiros caracteres da chave, só pra reconhecer qual é qual na listagem
+  ativa       Boolean   @default(true)
+  ultimoUsoEm DateTime?
+  createdAt   DateTime  @default(now())
+}
+
 // ─── PRECIFICAÇÃO MULTICANAL (Rótulo do Bem) ──────────────────
 // Independente de Precificacao/Plataforma: guarda os 5 canais
 // (Loja Própria, ML Full, ML Clássico, Shopee, TikTok Shop) lado
