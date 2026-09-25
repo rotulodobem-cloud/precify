@@ -30,6 +30,10 @@ farol-ads/
 
 ## Rodar localmente
 
+No Windows: dê dois cliques em **`ABRIR-FAROL.bat`** (instala tudo na primeira vez, cria o login `michele` / `farol123` e abre o navegador).
+
+Pelo terminal:
+
 ```bash
 cd farol-ads
 npm install
