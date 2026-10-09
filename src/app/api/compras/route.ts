@@ -3,6 +3,9 @@ import db from '@/lib/db'
 import { round2 } from '@/lib/calculos'
 import { saveCompra } from '@/lib/saveCompra'
 
+// compras com muitos itens fazem várias queries sequenciais por item; o limite padrão da Vercel estoura
+export const maxDuration = 60
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const q          = searchParams.get('q')
