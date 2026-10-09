@@ -232,16 +232,28 @@ function ComprasContent() {
     const itensValidos = itensCompra.filter(it => it.skuPrincipal && it.nomeProduto && it.quantidade && it.custoTotal)
     if (!itensValidos.length) { setError('Adicione ao menos um produto com SKU, quantidade e custo total'); setSaving(false); return }
 
-    const r = await fetch('/api/compras', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formCompra, itens: itensValidos }),
-    })
-    if (!r.ok) { const d = await r.json(); setError(d.error ?? 'Erro'); setSaving(false); return }
-    setModal(false)
-    setFormCompra(emptyFormCompra)
-    setItensCompra([{ ...emptyItem }])
-    setSkuLookups({})
-    load(); setSaving(false)
+    try {
+      const r = await fetch('/api/compras', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formCompra, itens: itensValidos }),
+      })
+      if (!r.ok) {
+        // resposta pode não ser JSON (ex.: timeout 504 da Vercel)
+        const d = await r.json().catch(() => ({}))
+        setError(d.error ?? `Erro ao registrar compra (HTTP ${r.status}). Confira a lista antes de tentar de novo — parte dos itens pode ter sido salva.`)
+        load()
+        return
+      }
+      setModal(false)
+      setFormCompra(emptyFormCompra)
+      setItensCompra([{ ...emptyItem }])
+      setSkuLookups({})
+      load()
+    } catch {
+      setError('Falha de conexão ao registrar compra. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── Editar compra ──────────────────────────────────────────
