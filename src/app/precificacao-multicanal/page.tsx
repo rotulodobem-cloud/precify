@@ -237,8 +237,8 @@ export default function PrecificacaoMulticanalPage() {
             <div><small>Rótulo do Bem</small><strong>Central de Precificação</strong></div>
           </div>
           <h1>O preço ideal de venda em <span>cada canal</span></h1>
-          <a href="/precos-praticados" className="inline-block mt-2.5 text-[11.5px] text-limao underline">
-            Importar preços praticados em massa (Loja Própria) →
+          <a href="/precificar" className="inline-block mt-2.5 text-[11.5px] text-limao underline">
+            Loja física e site ficam em Precificar →
           </a>
         </div>
 

@@ -14,7 +14,7 @@ const MODELO = process.env.PRECIFY_IA_MODELO || 'claude-opus-5-5'
 const SISTEMA = `Você é o analista de compras do Precify, o sistema oficial de CMV da Rótulo do Bem: loja de produtos naturais (granel, chás, temperos, castanhas, suplementos) com Loja Física, Loja Online, Mercado Livre, Shopee e TikTok Shop. Quem pergunta é a Michele, dona do negócio, que decide o que comprar, de quem e em que quantidade. Responda em português do Brasil, direto, como um comprador experiente que conhece a operação.
 
 Como ler o JSON que vem com a pergunta:
-- giro: estoque vem do Bling (foto do dia em foto_estoque) e as vendas somam todos os canais nas últimas 13 semanas. Cada produto tem: un (kg ou un), saldo, v30 (venda em 30 dias), dias (quantos dias o saldo dura no ritmo previsto; null = sem venda), sug (quantidade sugerida para cobrir prazo de entrega + cobertura_dias, já arredondada), forn (fornecedor da última compra), preco (último custo unitário pago), valor (sug × preco), tend (variação das 4 últimas semanas contra a média das 13; 0.2 = +20%), zerou (true = ficou dias sem estoque, então a venda real é maior que a registrada), precos (último preço de cada fornecedor com a data) e mais_barato (fornecedor com menor preço nos últimos 120 dias, quando há mais de um).
+- giro: estoque vem do Bling (foto do dia em foto_estoque) e as vendas somam todos os canais nas últimas 13 semanas. Cada produto tem: un (kg ou un), saldo, v30 (venda em 30 dias), dias (quantos dias o saldo dura no ritmo previsto; null = sem venda), sug (quantidade sugerida para cobrir prazo de entrega + cobertura_dias, já arredondada), forn (fornecedor da última compra), preco (último custo unitário pago), valor (sug × preco), tend (variação das 4 últimas semanas contra a média das 13; 0.2 = +20%), zerou (true = ficou dias sem estoque, então a venda real é maior que a registrada), v30_em_kits (parte de v30 que saiu dentro de kits; a venda de kits JÁ está somada na demanda dos componentes, e os kits não aparecem como item de compra), precos (último preço de cada fornecedor com a data) e mais_barato (fornecedor com menor preço nos últimos 120 dias, quando há mais de um).
 - status: "urgente" = o saldo acaba antes de uma nova entrega chegar; "comprar" = entra na compra desta rodada; "ok" = coberto; "parado" = mais de 120 dias de estoque ou sem venda com saldo.
 - pedido_por_fornecedor: soma do que está em urgente + comprar, por fornecedor da última compra.
 - compras: gasto do mês atual e do anterior, por fornecedor, pela data da compra lançada no Precify.
@@ -55,6 +55,7 @@ function linha(i: ItemSugestao, completo = false) {
     sug: i.sugestao, forn: i.fornecedorPadrao || null, preco: r2(i.custoRef), valor: r2(i.valorSugerido),
     ...(i.tendencia != null && Math.abs(i.tendencia) >= 0.15 ? { tend: r2(i.tendencia) } : {}),
     ...(i.corrigidoRuptura ? { zerou: true } : {}),
+    ...(i.viaKits30d > 0 ? { v30_em_kits: r1(i.viaKits30d) } : {}),
     ...(i.melhorPreco && i.melhorPreco !== i.fornecedorPadrao ? { mais_barato: i.melhorPreco } : {}),
     ...(i.status === 'parado' ? { valor_parado: r2(i.valorParado) } : {}),
     ...(completo ? { prazo_entrega_dias: i.prazoDias, v90: r1(i.venda90d), precos: i.fornecedores.map(f => ({ forn: f.nome, preco: r2(f.preco), data: dia(f.data), qtd: r1(f.qtd) })) } : {}),
@@ -100,7 +101,7 @@ async function montarContexto(pergunta: string) {
     giro: {
       foto_estoque: s.fotoEstoque, cobertura_dias: s.coberturaDias,
       prazo_entrega: 'cada produto traz o seu em prazo_entrega_dias quando citado; no geral são 2 dias',
-      resumo: { urgentes: resumo.urgentes, comprar: resumo.comprar, parados: resumo.parados, produtos_vendidos_sem_cadastro_no_precify: s.semCadastro },
+      resumo: { urgentes: resumo.urgentes, comprar: resumo.comprar, parados: resumo.parados, produtos_vendidos_sem_cadastro_no_precify: s.semCadastro, kits_vendidos_sem_composicao_cadastrada: s.kitsSemComposicao },
       pedido_por_fornecedor: resumo.pedidoPorFornecedor.slice(0, 25),
       urgentes: por('urgente', 'valorSugerido', 40),
       comprar: por('comprar', 'valorSugerido', 40),

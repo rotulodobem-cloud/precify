@@ -2,7 +2,7 @@
 // preços e fornecedores (Precify). Usado pela tela "O que comprar", pelo
 // Dashboard e pelas perguntas rápidas. Só roda no servidor.
 import db from '@/lib/db'
-import { calcularGiro, serieSemanal, arredondarCompra, prazoEntrega, type StatusGiro } from '@/lib/sugestaoCompra'
+import { calcularGiro, serieSemanal, arredondarCompra, prazoEntrega, SEMANAS, type StatusGiro } from '@/lib/sugestaoCompra'
 
 // O Farol (Supabase) sincroniza com o Bling e expõe uma função só de leitura,
 // protegida por chave própria.
@@ -52,18 +52,23 @@ export interface ItemSugestao {
   cobertura: number | null; prazoDias: number
   status: Exclude<StatusGiro, 'sem_venda'>; corrigidoRuptura: boolean
   sugestao: number; semanas: number[]
+  /** parte da venda em 30 dias que saiu dentro de kits (já somada em venda30d) */
+  viaKits30d: number
   fornecedores: FornecedorSugestao[]; fornecedorPadrao: string; melhorPreco: string | null
   custoRef: number | null; valorSugerido: number; valorParado: number
 }
 export interface Sugestoes {
-  fotoEstoque: string | null; geradoEm: string; coberturaDias: number; semCadastro: number; itens: ItemSugestao[]
+  fotoEstoque: string | null; geradoEm: string; coberturaDias: number; semCadastro: number
+  /** kits vendidos que não têm composição cadastrada no Precify: a venda deles não entra nos componentes */
+  kitsSemComposicao: number
+  itens: ItemSugestao[]
 }
 
 export async function montarSugestoes(coberturaDias = 30, forcar = false): Promise<Sugestoes> {
   const farol = await lerFarol(forcar)
 
   const umAno = new Date(); umAno.setDate(umAno.getDate() - 365)
-  const [produtos, compras, aliases] = await Promise.all([
+  const [produtos, compras, aliases, kits] = await Promise.all([
     db.produto.findMany({
       where: { status: 'ativo' },
       select: { skuPrincipal: true, nome: true, categoria: true, unidadeCompra: true, fornecedorPrincipal: true, custoAtualizado: true, custoPorKg: true, custoUnitario: true },
@@ -74,6 +79,7 @@ export async function montarSugestoes(coberturaDias = 30, forcar = false): Promi
       select: { skuPrincipal: true, fornecedor: true, custoUnitario: true, quantidade: true, dataCompra: true },
     }),
     db.fornecedorAlias.findMany({ where: { ativo: true }, select: { skuPrincipal: true, fornecedor: true, nomeNoFornecedor: true, codigoFornecedor: true } }),
+    db.kit.findMany({ where: { status: 'ativo' }, select: { skuKit: true, componentes: { select: { skuProduto: true, quantidadeGramas: true, quantidadeUn: true } } } }),
   ])
 
   const aliasDe = new Map(aliases.map(a => [`${a.skuPrincipal}|${a.fornecedor}`, a]))
@@ -88,12 +94,36 @@ export async function montarSugestoes(coberturaDias = 30, forcar = false): Promi
   const farolPorSku = new Map(farol.itens.map(i => [i.sku, i]))
   const skusPrecify = new Set(produtos.map(p => p.skuPrincipal))
 
+  // Kit vendido consome os componentes: cada kit soma, na demanda de cada
+  // componente, os gramas (granel) ou as unidades da sua composição.
+  const skusKit = new Set(kits.map(k => k.skuKit))
+  const viaKits = new Map<string, { kg: number[]; un: number[] }>()
+  for (const kit of kits) {
+    const vendasKit = farolPorSku.get(kit.skuKit)
+    if (!vendasKit) continue
+    const kitsPorSemana = serieSemanal(vendasKit.semanas.map(s => ({ s: s.s, valor: s.un })))
+    for (const comp of kit.componentes) {
+      const sku = comp.skuProduto.split('-')[0]
+      let acc = viaKits.get(sku)
+      if (!acc) { acc = { kg: new Array<number>(SEMANAS).fill(0), un: new Array<number>(SEMANAS).fill(0) }; viaKits.set(sku, acc) }
+      const kgPorKit = (comp.quantidadeGramas ?? 0) / 1000
+      const unPorKit = comp.quantidadeUn ?? 0
+      kitsPorSemana.forEach((n, s) => { acc!.kg[s] += n * kgPorKit; acc!.un[s] += n * unPorKit })
+    }
+  }
+  const kitsSemComposicao = farol.itens.filter(i => /^KIT/i.test(i.sku) && i.semanas.length > 0 && !skusKit.has(i.sku)).length
+
   const itens = produtos.flatMap((p): ItemSugestao[] => {
     const f = farolPorSku.get(p.skuPrincipal)
-    if (!f) return []
+    // kit é montado aqui, não comprado: quem entra na compra são os componentes
+    if (!f || skusKit.has(p.skuPrincipal)) return []
     // granel tem SKU só numérico; os demais códigos (AB…, CP…, VS…) são vendidos por unidade
     const emKg = p.unidadeCompra === 'kg' && /^[0-9]+$/.test(p.skuPrincipal)
-    const semanas = serieSemanal(f.semanas.map(s => ({ s: s.s, valor: emKg ? s.kg : s.un })))
+    const diretas = serieSemanal(f.semanas.map(s => ({ s: s.s, valor: emKg ? s.kg : s.un })))
+    const kit = viaKits.get(p.skuPrincipal)
+    const doKit = kit ? (emKg ? kit.kg : kit.un) : null
+    const semanas = doKit ? diretas.map((v, s) => v + doKit[s]) : diretas
+    const viaKits30d = doKit ? doKit.slice(0, 4).reduce((a, v) => a + v, 0) * (30 / 28) : 0
 
     const fornecedores = [...(fornPorSku.get(p.skuPrincipal)?.entries() ?? [])].map(([nome, u]) => {
       const a = aliasDe.get(`${p.skuPrincipal}|${nome}`)
@@ -116,7 +146,7 @@ export async function montarSugestoes(coberturaDias = 30, forcar = false): Promi
       saldo, semSaldoNoBling: f.saldo == null,
       venda30d: g.venda30d, venda90d: g.venda90d, vendaDia: g.vendaDia, tendencia: g.tendencia,
       cobertura: g.coberturaAtual, prazoDias, status: g.status, corrigidoRuptura: g.corrigidoRuptura,
-      sugestao,
+      sugestao, viaKits30d,
       semanas: [...semanas].reverse(), // do mais antigo ao mais recente, para o gráfico
       fornecedores, fornecedorPadrao, melhorPreco, custoRef,
       valorSugerido: sugestao * (custoRef ?? 0),
@@ -129,6 +159,7 @@ export async function montarSugestoes(coberturaDias = 30, forcar = false): Promi
     geradoEm: farol.gerado_em,
     coberturaDias,
     semCadastro: farol.itens.filter(i => i.semanas.length > 0 && !skusPrecify.has(i.sku) && !/^KIT/i.test(i.sku)).length,
+    kitsSemComposicao,
     itens,
   }
 }
@@ -153,7 +184,7 @@ export function resumirSugestoes(s: Sugestoes, top = 8) {
   }
 
   return {
-    fotoEstoque: s.fotoEstoque, coberturaDias: s.coberturaDias, semCadastro: s.semCadastro,
+    fotoEstoque: s.fotoEstoque, coberturaDias: s.coberturaDias, semCadastro: s.semCadastro, kitsSemComposicao: s.kitsSemComposicao,
     urgentes: { n: urg.length, valor: soma(urg, 'valorSugerido') },
     comprar: { n: com.length, valor: soma(com, 'valorSugerido') },
     parados: { n: par.length, valor: soma(par, 'valorParado') },
@@ -163,4 +194,30 @@ export function resumirSugestoes(s: Sugestoes, top = 8) {
       .map(([fornecedor, v]) => ({ fornecedor, itens: v.itens, urgentes: v.urgentes, valor: Math.round(v.valor * 100) / 100 }))
       .sort((a, b) => b.valor - a.valor),
   }
+}
+
+// ── Preços cadastrados no Bling e receita por produto (para a precificação) ──
+export interface PrecoVendaFarol {
+  sku: string; preco: number | null; preco_atualizado_em: string | null
+  receita_propria_90d: number; receita_mkt_90d: number
+  receita_propria_30d: number; kg_proprio_30d: number; un_proprio_30d: number
+}
+let cachePrecos: { em: number; dados: PrecoVendaFarol[] } | null = null
+
+export async function lerPrecosFarol(forcar = false): Promise<PrecoVendaFarol[]> {
+  if (!forcar && cachePrecos && Date.now() - cachePrecos.em < CACHE_MS) return cachePrecos.dados
+  const { FAROL_URL, FAROL_ANON_KEY, FAROL_CHAVE_LEITURA } = process.env
+  if (!FAROL_URL || !FAROL_ANON_KEY || !FAROL_CHAVE_LEITURA) throw new ErroFarol('SEM_CONFIG')
+  let r: Response
+  try {
+    r = await fetch(`${FAROL_URL}/rest/v1/rpc/precify_precos_venda`, {
+      method: 'POST', cache: 'no-store',
+      headers: { apikey: FAROL_ANON_KEY, Authorization: `Bearer ${FAROL_ANON_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_chave: FAROL_CHAVE_LEITURA }),
+    })
+  } catch { throw new ErroFarol('SEM_CONEXAO') }
+  if (!r.ok) throw new ErroFarol(`HTTP_${r.status}`)
+  const dados = ((await r.json()) as { itens: PrecoVendaFarol[] }).itens
+  cachePrecos = { em: Date.now(), dados }
+  return dados
 }

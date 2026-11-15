@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Package, Layers, Store, Tag,
+  LayoutDashboard, Package, Calculator, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
   Zap, Truck, Settings, Leaf, Percent, KeyRound
 } from 'lucide-react'
@@ -12,8 +12,9 @@ import type { Role } from '@/lib/auth'
 const links = [
   { href: '/',               label: 'Painel',         icon: LayoutDashboard },
   { divider: true,           label: 'Precificação' },
-  { href: '/precificacao-multicanal', label: 'Multicanal RdB', icon: Leaf },
-  { href: '/precos-praticados', label: 'Preços praticados', icon: Percent },
+  { href: '/precificar',     label: 'Loja e site',     icon: Calculator },
+  { href: '/analise-precos', label: 'Análise de preços', icon: Percent },
+  { href: '/precificacao-multicanal', label: 'Marketplaces', icon: Leaf },
   { href: '/frete',          label: 'Frete ML',        icon: Truck },
   { divider: true,           label: 'Cadastros' },
   { href: '/produtos',       label: 'Produtos',        icon: Package },

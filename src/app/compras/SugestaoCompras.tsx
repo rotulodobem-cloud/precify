@@ -14,11 +14,11 @@ interface ItemSug {
   venda30d: number; venda90d: number; vendaDia: number; tendencia: number | null
   cobertura: number | null; prazoDias: number
   status: 'urgente' | 'comprar' | 'ok' | 'parado'; corrigidoRuptura: boolean
-  sugestao: number; semanas: number[]
+  sugestao: number; semanas: number[]; viaKits30d: number
   fornecedores: FornSug[]; fornecedorPadrao: string; melhorPreco: string | null
   custoRef: number | null; valorParado: number
 }
-interface Dados { fotoEstoque: string | null; coberturaDias: number; semCadastro: number; itens: ItemSug[] }
+interface Dados { fotoEstoque: string | null; coberturaDias: number; semCadastro: number; kitsSemComposicao: number; itens: ItemSug[] }
 
 export interface ItemParaPedido {
   skuPrincipal: string; nomeProduto: string; nomeNoFornecedor?: string; codigoFornecedor?: string
@@ -151,6 +151,8 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
       {dados && (
         <p className="text-xs text-gray-500">
           Estoque do Bling fotografado em {dados.fotoEstoque ? new Date(dados.fotoEstoque + 'T12:00:00').toLocaleDateString('pt-BR') : '—'} · vendas das últimas 13 semanas em todos os canais
+          {' '}· kits contam na venda dos componentes
+          {dados.kitsSemComposicao > 0 && <> · <span className="text-amber-700">{dados.kitsSemComposicao} kits vendidos estão sem composição cadastrada em Kits</span></>}
           {dados.semCadastro > 0 && <> · <span className="text-amber-700">{dados.semCadastro} produtos vendidos não têm cadastro no Precify e ficaram de fora</span></>}
         </p>
       )}
@@ -198,6 +200,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
                         {i.tendencia > 0 ? '+' : ''}{Math.round(i.tendencia * 100)}% no mês
                       </div>
                     )}
+                    {i.viaKits30d > 0 && <div className="text-[10px] text-rdb-700" title="Parte da venda saiu dentro de kits">{qtd(i.viaKits30d)} {i.unidade} em kits</div>}
                     {i.corrigidoRuptura && <div className="text-[10px] text-amber-600" title="Ficou dias sem estoque; a previsão considera o que venderia se tivesse">ficou zerado</div>}
                   </td>
                   <td className="td"><Barras semanas={i.semanas} /></td>
