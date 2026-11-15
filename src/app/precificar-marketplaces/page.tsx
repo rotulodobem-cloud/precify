@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Search, Settings2, X, ChevronDown, Megaphone } from 'lucide-react'
 import { Spinner, Alert } from '@/components/ui'
 import {
-  CONFIG_MKT_PADRAO, CAMPOS_CONFIG_MKT, resultado, precoParaMargem, precoCadastro, acrescimoCadastro,
+  CONFIG_MKT_PADRAO, CAMPOS_CONFIG_MKT, resultado, precoParaMargem, precoCadastro,
   lerCampo, gravarCampo, type ConfigMkt, type Canal, type Semaforo, type EntradaMkt,
 } from '@/lib/precificacaoMkt'
 
@@ -44,38 +44,64 @@ function PainelCanal({ canal, entrada, precoTeste, cfg }: { canal: Canal; entrad
         <p className="p-6 text-sm text-perigo">Com essas taxas não existe preço que entregue a meta de {pct(cfg.meta, 0)}: comissão, Ads, imposto e margem somam mais que o preço. Revise Ads ou a meta em Parâmetros.</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-px bg-rdb-100">
-            <div className="bg-white p-4">
-              <div className="text-[11px] text-tinta-fraca">{precoTeste != null ? 'Margem no preço testado' : 'Margem no preço ideal'}</div>
-              <div className={`text-3xl font-bold font-titulo tabular-nums ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</div>
-              <div className="text-xs text-tinta-fraca">sobram {brl(r.margem)} por unidade vendida a {brl(r.preco)}</div>
-            </div>
-            <div className="bg-white p-4 space-y-2">
-              {[{ rotulo: `Preço ideal (meta ${pct(cfg.meta, 0)})`, p: ideal.preco, forte: true }, { rotulo: `Preço mínimo (piso ${pct(cfg.piso, 0)})`, p: piso.preco, forte: false }].map(l => (
-                <div key={l.rotulo}>
-                  <div className="text-[11px] text-tinta-fraca">{l.rotulo}</div>
-                  {l.p == null ? <div className="text-sm text-perigo">não existe com essas taxas</div> : (
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className={`tabular-nums font-bold ${l.forte ? 'text-lg text-rdb-700' : 'text-base text-tinta'}`}>{brl(l.p)}</span>
-                      <span className="text-[11px] text-tinta-fraca">cadastrar a <strong className="text-tinta">{brl(precoCadastro(l.p, cfg))}</strong></span>
+          {/* O que fazer no anúncio: preço cheio para cadastrar e preço em promoção */}
+          <div className="p-4 space-y-2">
+            {[
+              { rotulo: `Para a meta de ${pct(cfg.meta, 0)}`, p: ideal.preco, forte: true },
+              { rotulo: `No mínimo de ${pct(cfg.piso, 0)}`, p: piso.preco, forte: false },
+            ].map(l => (
+              <div key={l.rotulo} className={`rounded-xl border p-3 ${l.forte ? 'border-rdb-300 bg-rdb-50' : 'border-rdb-100 bg-white'}`}>
+                <div className="text-[11px] font-semibold text-tinta mb-1.5">{l.rotulo}</div>
+                {l.p == null ? <div className="text-sm text-perigo">não existe preço com essas taxas</div> : (
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Cadastrar o anúncio por</div>
+                      <div className={`tabular-nums font-bold font-titulo leading-tight ${l.forte ? 'text-2xl text-rdb-700' : 'text-lg text-tinta'}`}>{brl(precoCadastro(l.p, cfg))}</div>
                     </div>
-                  )}
+                    <div className="text-[10px] text-tinta-fraca text-center pb-1 shrink-0">promoção<br /><strong className="text-tinta">−{pct(cfg.descontoPromocao, 0)}</strong> →</div>
+                    <div className="flex-1 min-w-0 text-right">
+                      <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Preço promocional</div>
+                      <div className={`tabular-nums font-bold font-titulo leading-tight ${l.forte ? 'text-2xl text-tinta' : 'text-lg text-tinta'}`}>{brl(l.p)}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {precoTeste != null && (
+              <div className="rounded-xl border border-dashed border-atencao/60 bg-atencao/5 p-3">
+                <div className="text-[11px] font-semibold text-tinta mb-1.5">No preço que você está testando</div>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Cadastrar o anúncio por</div>
+                    <div className="tabular-nums font-bold font-titulo text-lg text-tinta leading-tight">{brl(precoCadastro(precoTeste, cfg))}</div>
+                  </div>
+                  <div className="text-[10px] text-tinta-fraca text-center pb-1 shrink-0">promoção<br /><strong className="text-tinta">−{pct(cfg.descontoPromocao, 0)}</strong> →</div>
+                  <div className="flex-1 min-w-0 text-right">
+                    <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Preço promocional</div>
+                    <div className="tabular-nums font-bold font-titulo text-lg text-tinta leading-tight">{brl(precoTeste)}</div>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
-          <table className="w-full border-t border-rdb-100">
+          <div className="px-4 py-3 border-t border-rdb-100 flex items-baseline justify-between gap-3">
+            <div className="text-xs text-tinta-fraca">{precoTeste != null ? 'Margem no preço testado' : 'Margem no preço promocional da meta'} — sobram {brl(r.margem)} por unidade</div>
+            <div className={`text-2xl font-bold font-titulo tabular-nums ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</div>
+          </div>
+
+          <table className="w-full border-t border-rdb-100 table-fixed">
+            <colgroup><col /><col className="w-24" /><col className="w-16" /></colgroup>
             <tbody>
-              <tr className="tr-row"><td className="td font-medium">Preço que o cliente paga</td><td className="td-r font-semibold">{brl(r.preco)}</td><td className="td-r text-xs text-tinta-fraca w-16">100%</td></tr>
+              <tr className="tr-row"><td className="td font-medium whitespace-normal">Preço promocional (o cliente paga)</td><td className="td-r font-semibold">{brl(r.preco)}</td><td className="td-r text-xs text-tinta-fraca">100%</td></tr>
               {r.linhas.map(l => (
                 <tr key={l.rotulo} className="tr-row">
-                  <td className="td text-tinta-fraca">− {l.rotulo}</td>
+                  <td className="td text-tinta-fraca whitespace-normal">− {l.rotulo}</td>
                   <td className="td-r">{brl(l.valor)}</td>
                   <td className="td-r text-xs text-tinta-fraca">{pct(l.valor / r.preco)}</td>
                 </tr>
               ))}
-              <tr><td className="td font-semibold">Margem de contribuição</td><td className={`td-r font-bold ${COR_TXT[r.semaforo]}`}>{brl(r.margem)}</td><td className={`td-r text-xs font-semibold ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</td></tr>
+              <tr><td className="td font-semibold whitespace-normal">Margem de contribuição</td><td className={`td-r font-bold ${COR_TXT[r.semaforo]}`}>{brl(r.margem)}</td><td className={`td-r text-xs font-semibold ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</td></tr>
             </tbody>
           </table>
 
@@ -215,8 +241,8 @@ function Conteudo() {
       <div className="flex items-start gap-3 rounded-xl border border-rdb-200 bg-rdb-50 px-4 py-3 text-sm text-tinta">
         <Megaphone size={16} className="text-rdb-700 mt-0.5 shrink-0" />
         <span>
-          <strong>Estratégia de cadastro:</strong> o anúncio sobe com o preço cheio e entra em promoção de {pct(cfg.descontoPromocao, 0)}, chegando ao preço de venda
-          (o preço cheio fica {pct(acrescimoCadastro(cfg))} acima). As taxas e a margem são calculadas sobre o preço que o cliente paga, em promoção. Ao lado de cada preço aparece o valor para cadastrar.
+          <strong>Como usar:</strong> em cada canal, o valor da esquerda é o <strong>preço para cadastrar no anúncio</strong> (preço cheio). Depois você cria a promoção de {pct(cfg.descontoPromocao, 0)} e o anúncio fica no <strong>preço promocional</strong> da direita, que é o que o cliente paga.
+          As taxas e a margem são calculadas sobre o preço promocional.
         </span>
       </div>
 
@@ -289,9 +315,9 @@ function Conteudo() {
             <input className="inp" inputMode="decimal" value={pesoTxt} onChange={e => setPesoTxt(e.target.value)} placeholder={txt(pesoKg)} />
           </div>
           <div>
-            <label className="lbl">Preço de venda a testar (R$)</label>
+            <label className="lbl">Preço promocional a testar (R$)</label>
             <input className="inp border-atencao/60 bg-atencao/5" inputMode="decimal" value={vendaTxt} onChange={e => setVendaTxt(e.target.value)} placeholder="vazio = preço ideal" />
-            {precoTeste != null && <p className="text-[10px] text-tinta-fraca mt-0.5">cadastrar a {brl(precoCadastro(precoTeste, cfg))}</p>}
+            <p className="text-[10px] text-tinta-fraca mt-0.5">preço promocional, o que o cliente paga</p>
           </div>
           <div>
             <label className="lbl">Comissão do anúncio no ML (%)</label>
