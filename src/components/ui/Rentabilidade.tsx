@@ -44,7 +44,10 @@ export default function Rentabilidade({ mes, escopo, comProdutos = false }: { me
   }, [mes])
   useEffect(() => { carregar() }, [carregar])
 
-  const lista = useMemo(() => canais.filter(c => (escopo === 'proprio' ? ehProprio(c) : !ehProprio(c))), [canais, escopo])
+  const doEscopo = useMemo(() => canais.filter(c => (escopo === 'proprio' ? ehProprio(c) : !ehProprio(c))), [canais, escopo])
+  // visão individual: com um canal escolhido, cartões, tabela, "R$ 100" e produtos mostram só ele
+  const canalValido = doEscopo.some(c => c.canal === canalSel) ? canalSel : ''
+  const lista = useMemo(() => (canalValido ? doEscopo.filter(c => c.canal === canalValido) : doEscopo), [doEscopo, canalValido])
   const t = useMemo(() => {
     const soma = (k: keyof Canal) => lista.reduce((s, c) => s + n(c[k]), 0)
     const rec = soma('receita_liquida')
@@ -60,13 +63,13 @@ export default function Rentabilidade({ mes, escopo, comProdutos = false }: { me
   // margem estimada do produto depois de taxa e imposto, pela taxa média do próprio canal
   const taxaDoCanal = useMemo(() => new Map(lista.map(c => [c.canal, n(c.receita_liquida) > 0 ? (n(c.taxas_canal) + n(c.impostos)) / n(c.receita_liquida) : 0])), [lista])
   const prods = useMemo(() => produtos
-    .filter(p => !canalSel || p.canal === canalSel)
+    .filter(p => !canalValido || p.canal === canalValido)
     .map(p => ({ ...p, margemLiquida: p.margem_bruta_pct == null ? null : n(p.margem_bruta_pct) / 100 - (taxaDoCanal.get(p.canal) ?? 0) }))
-    .sort((a, b) => n(b.receita) - n(a.receita)), [produtos, canalSel, taxaDoCanal])
+    .sort((a, b) => n(b.receita) - n(a.receita)), [produtos, canalValido, taxaDoCanal])
 
   if (loading) return <div className="card p-8 text-center"><Spinner size={16} className="mx-auto" /></div>
   if (erro) return <div className="bg-atencao/5 border border-atencao/30 rounded-xl p-3 text-sm text-atencao">{erro}</div>
-  if (!lista.length) return <div className="card p-8 text-center text-sm text-tinta-fraca">Sem vendas {escopo === 'proprio' ? 'em loja e site' : 'em marketplaces'} neste mês.</div>
+  if (!doEscopo.length) return <div className="card p-8 text-center text-sm text-tinta-fraca">Sem vendas {escopo === 'proprio' ? 'em loja e site' : 'em marketplaces'} neste mês.</div>
 
   const destino = [
     { rotulo: 'CMV (custo dos produtos)', valor: t.cmv, cor: '#055E2B' },
@@ -80,6 +83,17 @@ export default function Rentabilidade({ mes, escopo, comProdutos = false }: { me
 
   return (
     <div className="space-y-4">
+      {doEscopo.length > 1 && (
+        <div className="flex gap-1 bg-rdb-100/60 p-1 rounded-xl w-fit flex-wrap">
+          {[{ canal: '', rotulo: escopo === 'proprio' ? 'Todos os canais' : 'Todos os marketplaces' }, ...doEscopo.map(c => ({ canal: c.canal, rotulo: c.canal }))].map(o => (
+            <button key={o.canal} onClick={() => setCanalSel(o.canal)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${canalValido === o.canal ? 'bg-white text-tinta shadow-sm' : 'text-tinta-fraca hover:text-tinta'}`}>
+              {o.rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { rotulo: 'Faturamento líquido', valor: real0(t.receita), sub: `${new Intl.NumberFormat('pt-BR').format(t.pedidos)} pedidos` },
@@ -152,18 +166,14 @@ export default function Rentabilidade({ mes, escopo, comProdutos = false }: { me
         <div className="card">
           <div className="px-4 py-3 border-b border-rdb-100 flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h3 className="section-title">Produtos que mais vendem nos marketplaces</h3>
+              <h3 className="section-title">Produtos que mais vendem {canalValido ? `— ${canalValido}` : 'nos marketplaces'}</h3>
               <p className="text-xs text-tinta-fraca mt-0.5">Margem após taxa e imposto estimada pela taxa média do canal no mês; publicidade e frete não entram por produto</p>
             </div>
-            <select className="inp-sm w-auto" value={canalSel} onChange={e => setCanalSel(e.target.value)}>
-              <option value="">Todos os canais</option>
-              {lista.map(c => <option key={c.canal} value={c.canal}>{c.canal}</option>)}
-            </select>
           </div>
           <div className="overflow-auto max-h-[560px]">
             <table className="w-full">
               <thead className="tbl-head sticky top-0"><tr>
-                <th className="th">Produto</th><th className="th">Canal</th><th className="th-r">Qtd</th><th className="th-r">Faturamento</th>
+                <th className="th">Produto</th>{!canalValido && <th className="th">Canal</th>}<th className="th-r">Qtd</th><th className="th-r">Faturamento</th>
                 <th className="th-r">Preço médio</th><th className="th-r">Custo médio</th><th className="th-r">Margem bruta</th><th className="th-r">Após taxa e imposto</th>
               </tr></thead>
               <tbody>
@@ -174,7 +184,7 @@ export default function Rentabilidade({ mes, escopo, comProdutos = false }: { me
                       <div className="font-medium text-tinta max-w-[300px] truncate" title={p.descricao}>{p.descricao}</div>
                       <div className="text-[10px] text-tinta-fraca font-mono">{p.sku}</div>
                     </td>
-                    <td className="td text-xs">{p.canal}</td>
+                    {!canalValido && <td className="td text-xs">{p.canal}</td>}
                     <td className="td-r text-xs">{new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(n(p.qtd))}</td>
                     <td className="td-r">{real0(n(p.receita))}</td>
                     <td className="td-r text-xs">{brl(p.preco_medio)}</td>
