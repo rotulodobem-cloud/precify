@@ -35,7 +35,10 @@ export interface ConfigMkt {
     /** R$ por pedido */
     devolucao: number
     embalagem: number
+    /** frete médio por pedido, diluído em todos os pedidos (Entrega Padrão não custa nada) */
     frete: number
+    /** frete de um pedido em Entrega Direta: motoboy menos o crédito de frete da Shopee */
+    freteDireta: number
   }
   tiktok: {
     /** comissão e taxa fixa por item mudam quando o preço chega a `faixaAlta` */
@@ -57,7 +60,7 @@ export interface ConfigMkt {
 export const CONFIG_MKT_PADRAO: ConfigMkt = {
   imposto: 0.087, meta: 0.25, piso: 0.15, descontoPromocao: 0.30,
   ml: { comissao: 0.14, ads: 0.092, embalagem: 0.90, coleta: 0.60, armazenagem: 0, tetoEnvio: 0.25, tetoAte: 29 },
-  shopee: { comissao: 0.186, ads: 0.203, servico: 0.05, transacao: 0.014, afiliados: 0.024, devolucao: 0.49, embalagem: 1.50, frete: 1.22 },
+  shopee: { comissao: 0.186, ads: 0.203, servico: 0.05, transacao: 0.014, afiliados: 0.024, devolucao: 0.49, embalagem: 1.50, frete: 1.22, freteDireta: 3.99 },
   // TikTok: taxas herdadas da calculadora anterior do Precify; Ads sem histórico, começa em zero
   tiktok: { comissaoBaixa: 0.10, comissaoAlta: 0.06, taxaFixaBaixa: 4, taxaFixaAlta: 6, faixaAlta: 50, outras: 0.06, ads: 0, embalagem: 1.50, frete: 0 },
 }
@@ -86,7 +89,8 @@ export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotu
     { caminho: 'shopee.afiliados', rotulo: 'Afiliados (média)', tipo: 'pct' },
     { caminho: 'shopee.devolucao', rotulo: 'Devolução Fácil por pedido', tipo: 'reais' },
     { caminho: 'shopee.embalagem', rotulo: 'Embalagem por pedido', tipo: 'reais' },
-    { caminho: 'shopee.frete', rotulo: 'Custo líquido de frete por pedido', tipo: 'reais' },
+    { caminho: 'shopee.frete', rotulo: 'Frete médio por pedido (todas as entregas)', tipo: 'reais' },
+    { caminho: 'shopee.freteDireta', rotulo: 'Frete na Entrega Direta (motoboy − crédito)', tipo: 'reais' },
   ] },
   { grupo: 'TikTok Shop', campos: [
     { caminho: 'tiktok.comissaoBaixa', rotulo: 'Comissão abaixo da faixa', tipo: 'pct' },
@@ -160,6 +164,12 @@ export interface EntradaMkt {
   adsML?: number
   adsShopee?: number
   adsTiktok?: number
+  /**
+   * Como o pedido da Shopee é entregue. Só a Entrega Direta tem custo de frete:
+   * 'media' dilui esse custo em todos os pedidos, 'padrao' não cobra nada e
+   * 'direta' cobra o frete inteiro de um pedido com motoboy.
+   */
+  entregaShopee?: 'media' | 'padrao' | 'direta'
 }
 
 export interface LinhaCusto { rotulo: string; valor: number }
@@ -172,7 +182,9 @@ export interface ResultadoMkt {
 }
 
 const fixosML = (c: ConfigMkt) => c.ml.embalagem + c.ml.coleta + c.ml.armazenagem
-const fixosShopee = (c: ConfigMkt) => c.shopee.embalagem + c.shopee.devolucao + c.shopee.frete
+export const freteShopee = (e: EntradaMkt, c: ConfigMkt) =>
+  e.entregaShopee === 'padrao' ? 0 : e.entregaShopee === 'direta' ? c.shopee.freteDireta : c.shopee.frete
+const fixosShopee = (e: EntradaMkt, c: ConfigMkt) => c.shopee.embalagem + c.shopee.devolucao + freteShopee(e, c)
 const pctML = (e: EntradaMkt, c: ConfigMkt) => (e.comissaoML ?? c.ml.comissao) + c.imposto + (e.adsML ?? c.ml.ads)
 const pctShopee = (e: EntradaMkt, c: ConfigMkt) =>
   c.shopee.comissao + c.shopee.servico + c.shopee.transacao + c.shopee.afiliados + c.imposto + (e.adsShopee ?? c.shopee.ads)
@@ -215,7 +227,7 @@ export function resultado(canal: Canal, preco: number, e: EntradaMkt, c: ConfigM
         { rotulo: 'Serviço, transação e afiliados', valor: preco * (c.shopee.servico + c.shopee.transacao + c.shopee.afiliados) },
         { rotulo: 'Imposto', valor: preco * c.imposto },
         { rotulo: 'Ads', valor: preco * (e.adsShopee ?? c.shopee.ads) },
-        { rotulo: 'Embalagem, devolução e frete do pedido', valor: fixosShopee(c) },
+        { rotulo: 'Embalagem, devolução e frete do pedido', valor: fixosShopee(e, c) },
       ]
   const margem = preco - linhas.reduce((s, l) => s + l.valor, 0)
   const margemPct = preco > 0 ? margem / preco : 0
@@ -239,7 +251,7 @@ export interface FaixaPreco {
  */
 export function precoParaMargem(canal: Canal, margem: number, e: EntradaMkt, c: ConfigMkt): { preco: number | null; faixas: FaixaPreco[] } {
   const inicios = canal === 'ml' ? FAIXAS_PRECO_ML : canal === 'shopee' ? FAIXAS_PRECO_SHOPEE : [0, c.tiktok.faixaAlta]
-  const fixos = e.custo + (canal === 'ml' ? fixosML(c) : canal === 'shopee' ? fixosShopee(c) : fixosTiktok(c))
+  const fixos = e.custo + (canal === 'ml' ? fixosML(c) : canal === 'shopee' ? fixosShopee(e, c) : fixosTiktok(c))
 
   const faixas = inicios.map((de, i): FaixaPreco => {
     const ate = i + 1 < inicios.length ? inicios[i + 1] - 0.01 : null

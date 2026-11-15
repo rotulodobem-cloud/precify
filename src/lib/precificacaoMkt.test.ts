@@ -105,6 +105,24 @@ test('TikTok: o preço ideal entrega a meta e respeita a faixa', () => {
   perto(resultado('tiktok', caro.preco!, { custo: 40, pesoKg: 1 }, C).margemPct, C.meta, 0.0005)
 })
 
+test('frete da Shopee: só a Entrega Direta custa; a média dilui em todos os pedidos', () => {
+  const fixos = (entrega?: 'media' | 'padrao' | 'direta') =>
+    resultado('shopee', 45, { ...e, entregaShopee: entrega }, C).linhas.find(l => l.rotulo.startsWith('Embalagem'))!.valor
+  perto(fixos(), 3.21, 0.005)          // 1,50 + 0,49 + 1,22 (média)
+  perto(fixos('media'), 3.21, 0.005)
+  perto(fixos('padrao'), 1.99, 0.005)  // sem frete
+  perto(fixos('direta'), 5.98, 0.005)  // 1,50 + 0,49 + 3,99
+  // sem o frete, o preço mínimo cai
+  const padrao = precoParaMargem('shopee', C.piso, { ...e, entregaShopee: 'padrao' }, C).preco!
+  assert.ok(padrao < precoParaMargem('shopee', C.piso, e, C).preco!)
+})
+
+test('kit: custo e peso multiplicam, taxas por pedido não — o preço por unidade cai', () => {
+  const um = precoParaMargem('shopee', C.piso, e, C).preco!
+  const tres = precoParaMargem('shopee', C.piso, { custo: e.custo * 3, pesoKg: e.pesoKg * 3 }, C).preco!
+  assert.ok(tres / 3 < um, `${tres / 3} deveria ser menor que ${um}`)
+})
+
 test('comissão e Ads do anúncio substituem o padrão', () => {
   const r = resultado('ml', 45, { ...e, comissaoML: 0.19, adsML: 0 }, C)
   const v = Object.fromEntries(r.linhas.map(l => [l.rotulo, l.valor]))

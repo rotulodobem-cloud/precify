@@ -23,7 +23,7 @@ const COR: Record<Semaforo, string> = {
 const COR_TXT: Record<Semaforo, string> = { VERDE: 'text-ok', AMARELO: 'text-atencao', VERMELHO: 'text-perigo' }
 const NOME: Record<Canal, string> = { ml: 'Mercado Livre Full Super', shopee: 'Shopee', tiktok: 'TikTok Shop' }
 
-function PainelCanal({ canal, entrada, precoTeste, cfg }: { canal: Canal; entrada: EntradaMkt | null; precoTeste: number | null; cfg: ConfigMkt }) {
+function PainelCanal({ canal, entrada, precoTeste, cfg, unidades }: { canal: Canal; entrada: EntradaMkt | null; precoTeste: number | null; cfg: ConfigMkt; unidades: number }) {
   const [abrir, setAbrir] = useState(false)
   if (!entrada) {
     return <div className="card p-6 text-sm text-tinta-fraca text-center"><h2 className="section-title mb-2 text-tinta">{NOME[canal]}</h2>Informe o custo do item para calcular.</div>
@@ -63,6 +63,11 @@ function PainelCanal({ canal, entrada, precoTeste, cfg }: { canal: Canal; entrad
                       <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Preço promocional</div>
                       <div className={`tabular-nums font-bold font-titulo leading-tight ${l.forte ? 'text-2xl text-tinta' : 'text-lg text-tinta'}`}>{brl(l.p)}</div>
                     </div>
+                  </div>
+                )}
+                {l.p != null && unidades > 1 && (
+                  <div className="text-[11px] text-tinta-fraca mt-1.5 pt-1.5 border-t border-rdb-100">
+                    Kit com {unidades} unidades: sai a <strong className="text-tinta">{brl(l.p / unidades)}</strong> por unidade no preço promocional
                   </div>
                 )}
               </div>
@@ -156,6 +161,8 @@ function Conteudo() {
   const [adsMlTxt, setAdsMlTxt] = useState('')
   const [adsShTxt, setAdsShTxt] = useState('')
   const [adsTtTxt, setAdsTtTxt] = useState('')
+  const [unidades, setUnidades] = useState(1)
+  const [entrega, setEntrega] = useState<'media' | 'padrao' | 'direta'>('media')
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState(false)
@@ -187,9 +194,10 @@ function Conteudo() {
 
   // custo do item anunciado: granel = custo por kg × gramatura; unidade = custo unitário
   const f = item?.fracionado ? fator : 1
-  const custoAuto = item?.custo != null ? item.custo * f : null
+  // kit: o anúncio leva N unidades, então custo e peso multiplicam; taxas fixas e por pedido não
+  const custoAuto = item?.custo != null ? item.custo * f * unidades : null
   const custo = num(custoTxt) ?? custoAuto
-  const pesoKg = num(pesoTxt) ?? (item ? (item.fracionado ? fator : 0.3) : 1)
+  const pesoKg = num(pesoTxt) ?? (item ? (item.fracionado ? fator : 0.3) * unidades : unidades)
   const precoTeste = num(vendaTxt)
   const entrada: EntradaMkt | null = custo != null && custo > 0 ? {
     custo, pesoKg,
@@ -197,6 +205,7 @@ function Conteudo() {
     adsML: num(adsMlTxt) != null ? num(adsMlTxt)! / 100 : undefined,
     adsShopee: num(adsShTxt) != null ? num(adsShTxt)! / 100 : undefined,
     adsTiktok: num(adsTtTxt) != null ? num(adsTtTxt)! / 100 : undefined,
+    entregaShopee: entrega,
   } : null
 
   const abrirConfig = () => {
@@ -293,7 +302,7 @@ function Conteudo() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 items-start">
           {item?.fracionado && (
             <div>
               <label className="lbl">Gramatura do anúncio</label>
@@ -306,9 +315,21 @@ function Conteudo() {
             </div>
           )}
           <div>
+            <label className="lbl">Unidades no anúncio (kit)</label>
+            <div className="flex gap-1">
+              {[1, 2, 3].map(n => (
+                <button key={n} onClick={() => { setUnidades(n); setCustoTxt(''); setPesoTxt('') }}
+                  className={`flex-1 text-xs rounded-lg border px-1 py-2 ${unidades === n ? 'bg-rdb-700 text-white border-rdb-700' : 'bg-white border-rdb-200 text-tinta hover:bg-rdb-50'}`}>{n === 1 ? '1 un.' : `kit ${n}`}</button>
+              ))}
+              <input className="inp-sm w-14 text-center" type="number" min={1} max={50} value={unidades} title="Outra quantidade"
+                onChange={e => { const v = Math.floor(Number(e.target.value)); if (v >= 1 && v <= 50) { setUnidades(v); setCustoTxt(''); setPesoTxt('') } }} />
+            </div>
+          </div>
+          <div>
             <label className="lbl">Custo do item anunciado (R$)</label>
             <input className="inp" inputMode="decimal" value={custoTxt} onChange={e => setCustoTxt(e.target.value)} placeholder={custoAuto != null ? txt(custoAuto) : 'digite o custo'} />
-            {item && custoAuto != null && !num(custoTxt) && <p className="text-[10px] text-tinta-fraca mt-0.5">{item.fracionado ? `${brl(item.custo)}/kg × ${fator} kg` : 'custo unitário'} do Precify</p>}
+            {item && custoAuto != null && !num(custoTxt) && <p className="text-[10px] text-tinta-fraca mt-0.5">{item.fracionado ? `${brl(item.custo)}/kg × ${fator} kg` : 'custo unitário'}{unidades > 1 ? ` × ${unidades} un.` : ''} do Precify</p>}
+            {!item && unidades > 1 && <p className="text-[10px] text-tinta-fraca mt-0.5">informe o custo do kit inteiro ({unidades} unidades)</p>}
           </div>
           <div>
             <label className="lbl">Peso tarifado (kg) — só ML</label>
@@ -332,6 +353,14 @@ function Conteudo() {
             <input className="inp" inputMode="decimal" value={adsShTxt} onChange={e => setAdsShTxt(e.target.value)} placeholder={txt(cfg.shopee.ads * 100)} />
           </div>
           <div>
+            <label className="lbl">Entrega na Shopee</label>
+            <select className="inp" value={entrega} onChange={e => setEntrega(e.target.value as 'media' | 'padrao' | 'direta')}>
+              <option value="media">Média dos pedidos ({brl(cfg.shopee.frete)})</option>
+              <option value="padrao">Entrega Padrão — sem custo</option>
+              <option value="direta">Entrega Direta — motoboy ({brl(cfg.shopee.freteDireta)})</option>
+            </select>
+          </div>
+          <div>
             <label className="lbl">Ads no TikTok (% do preço)</label>
             <input className="inp" inputMode="decimal" value={adsTtTxt} onChange={e => setAdsTtTxt(e.target.value)} placeholder={txt(cfg.tiktok.ads * 100)} />
           </div>
@@ -339,9 +368,9 @@ function Conteudo() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-        <PainelCanal canal="ml" entrada={entrada} precoTeste={precoTeste} cfg={cfg} />
-        <PainelCanal canal="shopee" entrada={entrada} precoTeste={precoTeste} cfg={cfg} />
-        <PainelCanal canal="tiktok" entrada={entrada} precoTeste={precoTeste} cfg={cfg} />
+        <PainelCanal canal="ml" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} />
+        <PainelCanal canal="shopee" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} />
+        <PainelCanal canal="tiktok" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} />
       </div>
 
       <p className="text-xs text-tinta-fraca">
