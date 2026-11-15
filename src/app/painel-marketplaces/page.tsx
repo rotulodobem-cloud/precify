@@ -14,7 +14,7 @@ export default function PainelMarketplacesPage() {
         </div>
         <div className="flex items-center gap-2">
           <input type="month" className="inp-sm w-auto" value={mes} onChange={e => e.target.value && setMes(e.target.value)} />
-          <Link href="/precificacao-multicanal" className="btn-ghost text-xs">Precificar para marketplaces</Link>
+          <Link href="/precificar-marketplaces" className="btn-ghost text-xs">Precificar para marketplaces</Link>
         </div>
       </div>
       <Rentabilidade mes={mes} escopo="marketplace" comProdutos />

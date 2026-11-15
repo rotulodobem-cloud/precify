@@ -16,7 +16,7 @@ const links = [
   { href: '/analise-precos', label: 'Análise de preços', icon: Percent },
   { divider: true,           label: 'Marketplaces' },
   { href: '/painel-marketplaces', label: 'Painel', icon: Store },
-  { href: '/precificacao-multicanal', label: 'Precificar', icon: Leaf },
+  { href: '/precificar-marketplaces', label: 'Precificar', icon: Leaf },
   { href: '/frete',          label: 'Frete ML',        icon: Truck },
   { divider: true,           label: 'Cadastros' },
   { href: '/produtos',       label: 'Produtos',        icon: Package },
