@@ -30,8 +30,6 @@ export async function POST(req: NextRequest) {
   let role: Role | null = null
   if (u && process.env.ADMIN_USER && u === process.env.ADMIN_USER && p === process.env.ADMIN_PASSWORD) {
     role = 'admin'
-  } else if (u && process.env.PARTNER_USER && u === process.env.PARTNER_USER && p === process.env.PARTNER_PASSWORD) {
-    role = 'partner'
   }
 
   if (!role) {

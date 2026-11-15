@@ -26,8 +26,6 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // O menu depende de quem está logado, não da página aberta: assim a dona da
-  // loja continua com o menu inteiro ao visitar a tela do parceiro.
   const role = roleFromCookie(cookies().get('precify_auth')?.value)
 
   return (

@@ -4,13 +4,13 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Package, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
-  Zap, Truck, Settings, Leaf, LogOut, Percent, Handshake, KeyRound
+  Zap, Truck, Settings, Leaf, Percent, KeyRound
 } from 'lucide-react'
 import { EVENTO_ABRIR_BUSCA } from '@/components/ui/BuscaGlobal'
 import type { Role } from '@/lib/auth'
 
 const links = [
-  { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
+  { href: '/',               label: 'Painel',         icon: LayoutDashboard },
   { divider: true,           label: 'Precificação' },
   { href: '/precificacao-multicanal', label: 'Multicanal RdB', icon: Leaf },
   { href: '/precos-praticados', label: 'Preços praticados', icon: Percent },
@@ -24,43 +24,12 @@ const links = [
   { href: '/compras',        label: 'Compras',         icon: ShoppingCart },
   { href: '/lotes',          label: 'Lotes',           icon: Tag },
   { href: '/importar',       label: 'Importar XLSX',   icon: Upload },
-  { href: '/parceiro',       label: 'Tela do parceiro', icon: Handshake },
   { href: '/chaves-api',     label: 'Chaves de API',   icon: KeyRound },
   { href: '/configuracoes',  label: 'Configurações',   icon: Settings },
 ]
 
 export default function Sidebar({ role }: { role: Role | null }) {
   const path = usePathname()
-
-  // Menu reduzido é do parceiro, não da página: quem é admin mantém o menu
-  // inteiro mesmo visitando /parceiro.
-  if (role === 'partner') {
-    return (
-      <aside className="w-56 shrink-0 bg-rdb-800 min-h-screen flex flex-col">
-        <div className="px-4 py-5 border-b border-rdb-700/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-rdb-700 flex items-center justify-center">
-              <Zap size={15} className="text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm leading-none">Precify</p>
-              <p className="text-rdb-400 text-[10px] mt-0.5">Parceiro</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1" />
-        <div className="px-2 pb-3 border-t border-rdb-700/60 pt-3">
-          <button
-            onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login' }}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-rdb-200 hover:bg-rdb-700 hover:text-white transition-all w-full text-left"
-          >
-            <LogOut size={15} />
-            <span>Sair</span>
-          </button>
-        </div>
-      </aside>
-    )
-  }
 
   return (
     <aside className="w-56 shrink-0 bg-rdb-800 min-h-screen flex flex-col">

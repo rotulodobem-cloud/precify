@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { RefreshCw, TrendingDown, TrendingUp, AlertTriangle, PackageX, Calculator } from 'lucide-react'
+import { RefreshCw, TrendingDown, TrendingUp, AlertTriangle, PackageX, Calculator, ShoppingCart, ArrowRight, Star, Tag } from 'lucide-react'
+import PerguntaRapida from '@/components/ui/PerguntaRapida'
 import { Spinner, Loading, Empty } from '@/components/ui'
 import Sparkline from '@/components/charts/Sparkline'
 import BarraStatus from '@/components/charts/BarraStatus'
@@ -27,7 +28,37 @@ interface DashData {
   curvaA: ItemCurva[]
 }
 
+interface ItemGiro {
+  sku: string; nome: string; unidade: string; saldo: number; venda30d: number; cobertura: number | null
+  sugestao: number; fornecedor: string; melhorPreco: string | null; valorSugerido: number; valorParado: number
+}
+interface ResumoGiro {
+  fotoEstoque: string | null; coberturaDias: number; semCadastro: number
+  urgentes: { n: number; valor: number }; comprar: { n: number; valor: number }; parados: { n: number; valor: number }
+  topUrgentes: ItemGiro[]; topParados: ItemGiro[]
+  pedidoPorFornecedor: { fornecedor: string; itens: number; urgentes: number; valor: number }[]
+}
+const real0 = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
+const qtd1 = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(v)
+const duracao = (d: number | null) => d == null ? 'sem venda' : d > 365 ? '+1 ano' : Math.floor(d) === 1 ? '1 dia' : `${Math.floor(d)} dias`
+
 export default function DashboardPage() {
+  const [giro, setGiro] = useState<ResumoGiro | null>(null)
+  const [giroErro, setGiroErro] = useState<string | null>(null)
+  const [giroLoading, setGiroLoading] = useState(true)
+
+  const loadGiro = useCallback(async () => {
+    setGiroLoading(true); setGiroErro(null)
+    try {
+      const r = await fetch('/api/compras/sugestao?resumo=1')
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setGiro(null); setGiroErro(d.error ?? 'Não foi possível carregar o giro de estoque.'); return }
+      setGiro(d)
+    } catch { setGiro(null); setGiroErro('Falha de conexão ao carregar o giro de estoque.') }
+    finally { setGiroLoading(false) }
+  }, [])
+  useEffect(() => { loadGiro() }, [loadGiro])
+
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lotesVencendo, setLotesVencendo] = useState<number | null>(null)
@@ -69,13 +100,13 @@ export default function DashboardPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="text-sm text-tinta-fraca mt-0.5">O que precisa da sua atenção hoje, e onde está indo o dinheiro</p>
+          <h1 className="page-title">Painel de decisão</h1>
+          <p className="text-sm text-tinta-fraca mt-0.5">O que comprar, de quem, e onde o dinheiro está parado</p>
         </div>
         <div className="flex items-center gap-2">
           <input type="month" className="inp-sm w-auto" value={mes} onChange={e => setMes(e.target.value)} />
           <input className="inp-sm w-40" placeholder="Filtrar fornecedor…" value={fornecedor} onChange={e => setFornecedor(e.target.value)} />
-          <button onClick={load} className="btn-ghost gap-1.5" disabled={loading}>
+          <button onClick={() => { load(); loadGiro() }} className="btn-ghost gap-1.5" disabled={loading}>
             {loading ? <Spinner size={14} /> : <RefreshCw size={14} />} Atualizar
           </button>
         </div>
@@ -87,56 +118,138 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Precisa de atenção ── */}
+      <PerguntaRapida />
+
+      {/* ── Decisões de hoje ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <CardAlerta
-          n={data?.produtosPraAjustar.length ?? 0}
-          titulo="preços pra ajustar"
-          sub="custo mudou ou preço desatualizado"
-          href="#ajustar"
-          tom={data?.produtosPraAjustar.length ? 'atencao' : 'neutro'}
+          n={giro?.urgentes.n ?? 0}
+          titulo="acabam antes da entrega"
+          sub={giro ? `${real0(giro.urgentes.valor)} para repor` : giroLoading ? 'calculando…' : 'sem dados de estoque'}
+          href="/compras?aba=sugestao"
+          tom={giro?.urgentes.n ? 'perigo' : 'neutro'}
           icone={AlertTriangle}
         />
         <CardAlerta
-          n={data?.distribuicaoMargens.prejuizo ?? 0}
-          titulo="canais no prejuízo"
-          sub="margem abaixo de 20%"
-          href="#margens"
-          tom={data?.distribuicaoMargens.prejuizo ? 'perigo' : 'neutro'}
-          icone={TrendingDown}
+          n={giro?.comprar.n ?? 0}
+          titulo="para comprar nesta rodada"
+          sub={giro ? `${real0(giro.comprar.valor)} para ${giro.coberturaDias} dias de estoque` : giroLoading ? 'calculando…' : 'sem dados de estoque'}
+          href="/compras?aba=sugestao"
+          tom={giro?.comprar.n ? 'atencao' : 'neutro'}
+          icone={ShoppingCart}
         />
         <CardAlerta
-          n={lotesVencendo ?? 0}
-          titulo="lotes vencendo"
-          sub="vencidos ou vencem em 30 dias"
-          href="/lotes"
-          tom={lotesVencendo ? 'atencao' : 'neutro'}
+          n={giro?.parados.n ?? 0}
+          titulo="produtos com estoque parado"
+          sub={giro ? `${real0(giro.parados.valor)} presos há mais de 120 dias` : giroLoading ? 'calculando…' : 'sem dados de estoque'}
+          href="#parados"
+          tom={giro?.parados.n ? 'atencao' : 'neutro'}
           icone={PackageX}
         />
         <CardAlerta
-          n={custosQueSubiram}
-          titulo="custos que subiram"
-          sub="pedem reajuste de preço"
+          n={data?.produtosPraAjustar.length ?? 0}
+          titulo="preços pra ajustar"
+          sub={custosQueSubiram ? `${custosQueSubiram} com custo que subiu` : 'custo mudou ou preço desatualizado'}
           href="#ajustar"
-          tom={custosQueSubiram ? 'atencao' : 'neutro'}
+          tom={data?.produtosPraAjustar.length ? 'atencao' : 'neutro'}
           icone={TrendingUp}
         />
       </div>
 
-      {/* ── Saúde das margens + gasto no tempo ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div className="card p-4" id="margens">
-          <h2 className="section-title mb-3">Saúde das margens</h2>
-          {loading || !data
-            ? <div className="py-8 text-center"><Spinner size={16} className="mx-auto" /></div>
-            : <BarraStatus dist={data.distribuicaoMargens} />}
+      <div className="flex flex-wrap gap-2 text-xs">
+        <Link href="/lotes" className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 ${lotesVencendo ? 'border-atencao/40 bg-atencao/5 text-atencao' : 'border-rdb-100 text-tinta-fraca'}`}>
+          <Tag size={11} /> {lotesVencendo === 1 ? '1 lote vencido ou vencendo' : `${lotesVencendo ?? 0} lotes vencidos ou vencendo`} em 30 dias
+        </Link>
+        <a href="#margens" className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 ${data?.distribuicaoMargens.prejuizo ? 'border-perigo/40 bg-perigo/5 text-perigo' : 'border-rdb-100 text-tinta-fraca'}`}>
+          <TrendingDown size={11} /> {data?.distribuicaoMargens.prejuizo ?? 0} canais com margem abaixo de 20%
+        </a>
+        {giro?.fotoEstoque && (
+          <span className="inline-flex items-center rounded-full border border-rdb-100 px-3 py-1 text-tinta-fraca">
+            Estoque do Bling em {new Date(giro.fotoEstoque + 'T12:00:00').toLocaleDateString('pt-BR')}
+          </span>
+        )}
+      </div>
+
+      {giroErro && (
+        <div className="bg-atencao/5 border border-atencao/30 rounded-xl p-3 text-sm text-atencao">{giroErro}</div>
+      )}
+
+      {/* ── Compre primeiro + pedido por fornecedor ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+        <div className="card xl:col-span-3">
+          <div className="px-4 py-3 border-b border-rdb-100 flex items-center justify-between">
+            <div>
+              <h2 className="section-title">Compre primeiro</h2>
+              <p className="text-xs text-tinta-fraca mt-0.5">Os que acabam antes de uma nova entrega chegar, pelo valor a repor</p>
+            </div>
+            <Link href="/compras?aba=sugestao" className="text-xs font-medium text-rdb-700 hover:text-rdb-800 inline-flex items-center gap-1 whitespace-nowrap">
+              Ver todos e montar pedido <ArrowRight size={12} />
+            </Link>
+          </div>
+          <div className="overflow-auto">
+            <table className="w-full">
+              <thead className="tbl-head"><tr>
+                <th className="th">Produto</th><th className="th-r">Estoque</th><th className="th-r">Dura</th>
+                <th className="th-r">Comprar</th><th className="th">Fornecedor</th><th className="th-r">Custo</th>
+              </tr></thead>
+              <tbody>
+                {giroLoading && <Loading />}
+                {!giroLoading && !giro?.topUrgentes.length && <Empty msg={giroErro ? 'Sem dados de estoque' : 'Nada acabando antes da entrega'} />}
+                {giro?.topUrgentes.map(i => (
+                  <tr key={i.sku} className="tr-row">
+                    <td className="td">
+                      <Link href={`/busca?q=${encodeURIComponent(i.sku)}`} className="font-medium text-tinta hover:text-rdb-700 block max-w-[190px] truncate" title={i.nome}>{i.nome}</Link>
+                      <div className="text-[10px] text-tinta-fraca font-mono">{i.sku}</div>
+                    </td>
+                    <td className="td-r text-xs">{qtd1(i.saldo)} {i.unidade}</td>
+                    <td className="td-r text-xs font-bold text-perigo">{duracao(i.cobertura)}</td>
+                    <td className="td-r font-semibold">{qtd1(i.sugestao)} <span className="text-xs font-normal text-tinta-fraca">{i.unidade}</span></td>
+                    <td className="td text-xs">
+                      <span className="block max-w-[120px] truncate" title={i.fornecedor}>{i.fornecedor || '—'}</span>
+                      {i.melhorPreco && i.melhorPreco !== i.fornecedor && (
+                        <div className="text-[10px] text-ok flex items-center gap-0.5"><Star size={9} /> {i.melhorPreco} mais barato</div>
+                      )}
+                    </td>
+                    <td className="td-r text-xs">{real0(i.valorSugerido)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="card p-4">
-          <h2 className="section-title mb-1">Onde vai o dinheiro</h2>
-          <p className="text-xs text-tinta-fraca mb-3">Gasto com compras, mês a mês</p>
-          {loading || !data
-            ? <div className="py-8 text-center"><Spinner size={16} className="mx-auto" /></div>
-            : <AreaMensal serie={data.serieMensal} />}
+
+        <div className="card xl:col-span-2">
+          <div className="px-4 py-3 border-b border-rdb-100">
+            <h2 className="section-title">Pedido por fornecedor</h2>
+            <p className="text-xs text-tinta-fraca mt-0.5">Quanto sai para cada um se você comprar tudo o que está sugerido</p>
+          </div>
+          <div className="p-4 space-y-2.5 max-h-[420px] overflow-auto">
+            {giroLoading && <div className="py-8 text-center"><Spinner size={16} className="mx-auto" /></div>}
+            {!giroLoading && !giro?.pedidoPorFornecedor.length && <p className="text-sm text-tinta-fraca py-6 text-center">Nenhuma compra sugerida</p>}
+            {giro && (() => {
+              const max = Math.max(...giro.pedidoPorFornecedor.map(p => p.valor), 1)
+              return giro.pedidoPorFornecedor.slice(0, 12).map(p => (
+                <div key={p.fornecedor}>
+                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="font-medium text-tinta truncate">{p.fornecedor}</span>
+                    <span className="tabular-nums font-semibold text-tinta whitespace-nowrap">{real0(p.valor)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-1.5 bg-rdb-50 rounded-full"><div className="h-1.5 rounded-full bg-rdb-600" style={{ width: `${(p.valor / max) * 100}%` }} /></div>
+                    <span className="text-[10px] text-tinta-fraca whitespace-nowrap w-32 text-right">
+                      {p.itens} {p.itens === 1 ? 'item' : 'itens'}{p.urgentes > 0 && <span className="text-perigo"> · {p.urgentes} {p.urgentes === 1 ? 'urgente' : 'urgentes'}</span>}
+                    </span>
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+          {giro && giro.pedidoPorFornecedor.length > 0 && (
+            <div className="px-4 py-2.5 border-t border-rdb-100 text-xs text-tinta-fraca flex justify-between">
+              <span>Total sugerido</span>
+              <strong className="text-tinta">{real0(giro.urgentes.valor + giro.comprar.valor)}</strong>
+            </div>
+          )}
         </div>
       </div>
 
@@ -207,6 +320,23 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Saúde das margens + gasto no tempo ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="card p-4" id="margens">
+          <h2 className="section-title mb-3">Saúde das margens</h2>
+          {loading || !data
+            ? <div className="py-8 text-center"><Spinner size={16} className="mx-auto" /></div>
+            : <BarraStatus dist={data.distribuicaoMargens} />}
+        </div>
+        <div className="card p-4">
+          <h2 className="section-title mb-1">Quanto você comprou</h2>
+          <p className="text-xs text-tinta-fraca mb-3">Gasto com compras, mês a mês</p>
+          {loading || !data
+            ? <div className="py-8 text-center"><Spinner size={16} className="mx-auto" /></div>
+            : <AreaMensal serie={data.serieMensal} />}
+        </div>
+      </div>
+
       {/* ── Curva A ── */}
       <div className="card" id="curvaA">
         <div className="px-4 py-3 border-b border-rdb-100">
@@ -268,30 +398,37 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Produtos parados ── */}
-      <div className="card p-4" id="parados">
-        <h2 className="section-title mb-3 flex items-center gap-2">
-          <PackageX size={13} className="text-tinta-fraca" /> Produtos sem compra recente
-        </h2>
-        {!data?.produtosParados.length ? (
-          <p className="text-sm text-tinta-fraca py-4 text-center">Nenhum produto parado</p>
-        ) : (
-          <div className="space-y-2 max-h-72 overflow-auto">
-            {data.produtosParados.map((p, i) => (
-              <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-rdb-100 last:border-0">
-                <div>
-                  <Link href={`/busca?q=${encodeURIComponent(p.skuPrincipal)}`} className="font-medium text-tinta hover:text-rdb-700">
-                    {p.nome}
-                  </Link>
-                  <span className="text-xs text-tinta-fraca ml-2">#{p.skuPrincipal}</span>
-                </div>
-                <span className="text-xs text-tinta-fraca">
-                  {p.dataUltimaCompra ? `última: ${fmtData(p.dataUltimaCompra)}` : 'nunca comprado'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* ── Dinheiro parado ── */}
+      <div className="card" id="parados">
+        <div className="px-4 py-3 border-b border-rdb-100">
+          <h2 className="section-title flex items-center gap-2"><PackageX size={13} className="text-tinta-fraca" /> Dinheiro parado em estoque</h2>
+          <p className="text-xs text-tinta-fraca mt-0.5">Estoque para mais de 120 dias ou sem venda: segure a compra, faça promoção ou confira o saldo no Bling</p>
+        </div>
+        <div className="overflow-auto">
+          <table className="w-full">
+            <thead className="tbl-head"><tr>
+              <th className="th">Produto</th><th className="th-r">Estoque</th><th className="th-r">Vende em 30 dias</th>
+              <th className="th-r">Dura</th><th className="th-r">Valor parado</th><th className="th">Último fornecedor</th>
+            </tr></thead>
+            <tbody>
+              {giroLoading && <Loading />}
+              {!giroLoading && !giro?.topParados.length && <Empty msg={giroErro ? 'Sem dados de estoque' : 'Nenhum estoque parado'} />}
+              {giro?.topParados.map(i => (
+                <tr key={i.sku} className="tr-row">
+                  <td className="td">
+                    <Link href={`/busca?q=${encodeURIComponent(i.sku)}`} className="font-medium text-tinta hover:text-rdb-700">{i.nome}</Link>
+                    <div className="text-[10px] text-tinta-fraca font-mono">{i.sku}</div>
+                  </td>
+                  <td className="td-r text-xs">{qtd1(i.saldo)} {i.unidade}</td>
+                  <td className="td-r text-xs">{qtd1(i.venda30d)} {i.unidade}</td>
+                  <td className="td-r text-xs font-semibold">{duracao(i.cobertura)}</td>
+                  <td className="td-r font-semibold">{real0(i.valorParado)}</td>
+                  <td className="td text-xs text-tinta-fraca">{i.fornecedor || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

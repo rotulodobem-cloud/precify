@@ -424,20 +424,42 @@ function ComprasContent() {
     else if (aba === 'aliases') loadAliases()
   }, [aba, loadCurva, loadAliases])
 
+  // a busca devolve { results: [...] }; com mais de um produto, a pessoa escolhe qual
+  const [buscaOpcoes, setBuscaOpcoes] = useState<{ sku: string; nome: string }[]>([])
+  const [buscaMsg, setBuscaMsg]       = useState('')
+
+  const escolherProduto = async (prod: { sku: string; nome: string }) => {
+    setBuscando(true); setBuscaOpcoes([]); setBuscaMsg('')
+    try {
+      setBuscaRes(prod)
+      const s = await fetch(`/api/compras/lista?tipo=sugestao&sku=${encodeURIComponent(prod.sku)}`)
+      if (!s.ok) throw new Error()
+      const sData = await s.json()
+      setSugestao(sData)
+      setFornSel(sData.fornecedorSugerido || '')
+      setQtdInput(String(sData.sugestaoQtd || ''))
+    } catch {
+      setBuscaRes(null); setBuscaMsg('Não foi possível carregar os dados desse produto. Tente de novo.')
+    } finally { setBuscando(false) }
+  }
+
   const buscarProduto = async () => {
-    if (!buscaPedido.trim()) return
-    setBuscando(true); setSugestao(null); setBuscaRes(null)
-    const r = await fetch(`/api/busca?q=${encodeURIComponent(buscaPedido)}`)
-    const data = await r.json()
-    if (!data.length) { setBuscando(false); return }
-    const prod = data[0]
-    setBuscaRes({ sku: prod.skuPrincipal, nome: prod.nome })
-    const s = await fetch(`/api/compras/lista?tipo=sugestao&sku=${prod.skuPrincipal}`)
-    const sData = await s.json()
-    setSugestao(sData)
-    setFornSel(sData.fornecedorSugerido || '')
-    setQtdInput(String(sData.sugestaoQtd || ''))
-    setBuscando(false)
+    const termo = buscaPedido.trim()
+    if (termo.length < 2) { setBuscaMsg('Digite ao menos 2 letras ou números.'); return }
+    setBuscando(true); setSugestao(null); setBuscaRes(null); setBuscaOpcoes([]); setBuscaMsg('')
+    try {
+      const r = await fetch(`/api/busca?q=${encodeURIComponent(termo)}`)
+      if (!r.ok) throw new Error()
+      const data = await r.json()
+      const lista: { skuPrincipal: string; nome: string }[] = Array.isArray(data) ? data : (data.results ?? [])
+      const opcoes = lista.map(p => ({ sku: p.skuPrincipal, nome: p.nome }))
+      if (!opcoes.length) { setBuscaMsg(`Nenhum produto encontrado para "${termo}".`); return }
+      const exato = opcoes.find(o => o.sku.toLowerCase() === termo.toLowerCase())
+      if (exato || opcoes.length === 1) { await escolherProduto(exato ?? opcoes[0]); return }
+      setBuscaOpcoes(opcoes)
+    } catch {
+      setBuscaMsg('Falha ao buscar. Verifique a conexão e tente de novo.')
+    } finally { setBuscando(false) }
   }
 
   const adicionarAoPedido = () => {
@@ -966,6 +988,21 @@ function ComprasContent() {
                 <Search size={14} /> {buscando ? 'Buscando...' : 'Buscar'}
               </button>
             </div>
+
+            {buscaMsg && <p className="text-xs text-red-600 mt-2">{buscaMsg}</p>}
+            {buscaOpcoes.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-600 mb-1.5">{buscaOpcoes.length} produtos encontrados — escolha um:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {buscaOpcoes.map(o => (
+                    <button key={o.sku} onClick={() => escolherProduto(o)}
+                      className="text-xs bg-white border border-gray-200 hover:border-rdb-600 rounded-lg px-2.5 py-1.5 text-left">
+                      <span className="font-medium text-gray-800">{o.nome}</span> <span className="text-gray-400 font-mono">{o.sku}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {buscaRes && sugestao && (
               <div className="mt-4 bg-white border border-gray-200 rounded-xl p-4 space-y-3">
