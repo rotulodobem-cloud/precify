@@ -27,6 +27,8 @@ export interface ConfigMkt {
     /** Full Super: abaixo de `tetoAte`, o envio custa no máximo `tetoEnvio` do preço */
     tetoEnvio: number
     tetoAte: number
+    /** ROAS que o canal entrega de verdade ÷ meta configurada (1 = entrega o que se pede) */
+    fatorRoas: number
   }
   shopee: {
     comissao: number
@@ -41,6 +43,8 @@ export interface ConfigMkt {
     frete: number
     /** frete de um pedido em Entrega Direta: motoboy menos o crédito de frete da Shopee */
     freteDireta: number
+    /** a Shopee entrega ROAS ~25% abaixo da meta configurada */
+    fatorRoas: number
   }
   tiktok: {
     /** comissão e taxa fixa por item mudam quando o preço chega a `faixaAlta` */
@@ -55,19 +59,20 @@ export interface ConfigMkt {
     /** R$ por pedido */
     embalagem: number
     frete: number
+    fatorRoas: number
   }
 }
 
 /** Valores da aba MKT CONFIG em 15/11/2026. */
 export const CONFIG_MKT_PADRAO: ConfigMkt = {
   imposto: 0.087, meta: 0.25, piso: 0.15, descontoPromocao: 0.30, reservaAds: 0.08,
-  ml: { comissao: 0.14, ads: 0.092, embalagem: 0.90, coleta: 0.60, armazenagem: 0, tetoEnvio: 0.25, tetoAte: 29 },
-  shopee: { comissao: 0.186, ads: 0.203, servico: 0.05, transacao: 0.014, afiliados: 0.024, devolucao: 0.49, embalagem: 1.50, frete: 1.22, freteDireta: 3.99 },
+  ml: { comissao: 0.14, ads: 0.092, embalagem: 0.90, coleta: 0.60, armazenagem: 0, tetoEnvio: 0.25, tetoAte: 29, fatorRoas: 1 },
+  shopee: { comissao: 0.186, ads: 0.203, servico: 0.05, transacao: 0.014, afiliados: 0.024, devolucao: 0.49, embalagem: 1.50, frete: 1.22, freteDireta: 3.99, fatorRoas: 0.75 },
   // TikTok: taxas herdadas da calculadora anterior do Precify; Ads sem histórico, começa em zero
-  tiktok: { comissaoBaixa: 0.10, comissaoAlta: 0.06, taxaFixaBaixa: 4, taxaFixaAlta: 6, faixaAlta: 50, outras: 0.06, ads: 0, embalagem: 1.50, frete: 0 },
+  tiktok: { comissaoBaixa: 0.10, comissaoAlta: 0.06, taxaFixaBaixa: 4, taxaFixaAlta: 6, faixaAlta: 50, outras: 0.06, ads: 0, embalagem: 1.50, frete: 0, fatorRoas: 1 },
 }
 
-export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotulo: string; tipo: 'pct' | 'reais' }[] }[] = [
+export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotulo: string; tipo: 'pct' | 'reais' | 'num' }[] }[] = [
   { grupo: 'Geral', campos: [
     { caminho: 'imposto', rotulo: 'Imposto Simples', tipo: 'pct' },
     { caminho: 'meta', rotulo: 'Meta de margem', tipo: 'pct' },
@@ -77,16 +82,15 @@ export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotu
   ] },
   { grupo: 'Mercado Livre Full Super', campos: [
     { caminho: 'ml.comissao', rotulo: 'Comissão', tipo: 'pct' },
-    { caminho: 'ml.ads', rotulo: 'Ads (% do preço)', tipo: 'pct' },
     { caminho: 'ml.embalagem', rotulo: 'Embalagem por unidade', tipo: 'reais' },
     { caminho: 'ml.coleta', rotulo: 'Coleta / envio ao Full por unidade', tipo: 'reais' },
     { caminho: 'ml.armazenagem', rotulo: 'Armazenagem por unidade', tipo: 'reais' },
     { caminho: 'ml.tetoEnvio', rotulo: 'Teto do envio (% do preço)', tipo: 'pct' },
     { caminho: 'ml.tetoAte', rotulo: 'Teto vale para preço abaixo de', tipo: 'reais' },
+    { caminho: 'ml.fatorRoas', rotulo: 'ROAS real ÷ ROAS objetivo (1 = igual)', tipo: 'num' },
   ] },
   { grupo: 'Shopee', campos: [
     { caminho: 'shopee.comissao', rotulo: 'Comissão', tipo: 'pct' },
-    { caminho: 'shopee.ads', rotulo: 'Ads (% do preço)', tipo: 'pct' },
     { caminho: 'shopee.servico', rotulo: 'Taxa de serviço adicional', tipo: 'pct' },
     { caminho: 'shopee.transacao', rotulo: 'Taxa de transação', tipo: 'pct' },
     { caminho: 'shopee.afiliados', rotulo: 'Afiliados (média)', tipo: 'pct' },
@@ -94,6 +98,7 @@ export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotu
     { caminho: 'shopee.embalagem', rotulo: 'Embalagem por pedido', tipo: 'reais' },
     { caminho: 'shopee.frete', rotulo: 'Frete médio por pedido (todas as entregas)', tipo: 'reais' },
     { caminho: 'shopee.freteDireta', rotulo: 'Frete na Entrega Direta (motoboy − crédito)', tipo: 'reais' },
+    { caminho: 'shopee.fatorRoas', rotulo: 'ROAS real ÷ meta configurada (0,75 = entrega 25% abaixo)', tipo: 'num' },
   ] },
   { grupo: 'TikTok Shop', campos: [
     { caminho: 'tiktok.comissaoBaixa', rotulo: 'Comissão abaixo da faixa', tipo: 'pct' },
@@ -102,9 +107,9 @@ export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotu
     { caminho: 'tiktok.taxaFixaAlta', rotulo: 'Taxa fixa a partir da faixa', tipo: 'reais' },
     { caminho: 'tiktok.faixaAlta', rotulo: 'A faixa muda no preço de', tipo: 'reais' },
     { caminho: 'tiktok.outras', rotulo: 'Afiliados e outras taxas', tipo: 'pct' },
-    { caminho: 'tiktok.ads', rotulo: 'Ads (% do preço)', tipo: 'pct' },
     { caminho: 'tiktok.embalagem', rotulo: 'Embalagem por pedido', tipo: 'reais' },
     { caminho: 'tiktok.frete', rotulo: 'Custo líquido de frete por pedido', tipo: 'reais' },
+    { caminho: 'tiktok.fatorRoas', rotulo: 'ROAS real ÷ meta configurada (1 = igual)', tipo: 'num' },
   ] },
 ]
 
@@ -248,6 +253,38 @@ export function resultado(canal: Canal, preco: number, e: EntradaMkt, c: ConfigM
   return {
     preco, linhas, margem, margemPct, semaforo: semaforo(margemPct, c),
     adsPct, sobraAntesAds, adsMaximo, roasMinimo: adsMaximo > 1e-9 ? 1 / adsMaximo : null,
+  }
+}
+
+/**
+ * Ads de um anúncio, pela regra combinada: só entra Ads quando a sobra SEM Ads
+ * chega ao piso de margem. O Ads pode comer até a sobra menos a reserva (8
+ * pontos), o que dá o ROAS real mínimo; a meta a configurar corrige o quanto o
+ * canal entrega abaixo do pedido (na Shopee, ROAS real ≈ 0,75 × meta).
+ */
+export interface PlanoAds {
+  cabe: boolean
+  /** sobra antes do Ads, como fração do preço */
+  sobra: number
+  /** quanto do preço pode ir para Ads */
+  adsMaximo: number
+  /** ROAS real que o anúncio precisa fazer */
+  roasReal: number | null
+  /** meta de ROAS para digitar no anúncio (ou ROAS objetivo da campanha no ML) */
+  metaConfigurar: number | null
+  fator: number
+  /** quanto pode gastar de Ads por venda, em R$ */
+  adsPorVenda: number
+}
+export function planoAds(canal: Canal, r: ResultadoMkt, c: ConfigMkt): PlanoAds {
+  const fator = canal === 'ml' ? c.ml.fatorRoas : canal === 'shopee' ? c.shopee.fatorRoas : c.tiktok.fatorRoas
+  const sobra = r.sobraAntesAds
+  const cabe = sobra >= c.piso - 1e-6 && r.adsMaximo > 1e-9
+  const roasReal = cabe ? 1 / r.adsMaximo : null
+  return {
+    cabe, sobra, adsMaximo: cabe ? r.adsMaximo : 0, roasReal,
+    metaConfigurar: roasReal != null && fator > 0 ? roasReal / fator : roasReal,
+    fator, adsPorVenda: cabe ? r.adsMaximo * r.preco : 0,
   }
 }
 

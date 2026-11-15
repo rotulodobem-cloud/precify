@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import {
   CONFIG_MKT_PADRAO as C, resultado, precoParaMargem, envioML, taxaFixaShopee,
-  precoCadastro, acrescimoCadastro, taxaFixaTiktok, lerCampo, gravarCampo,
+  precoCadastro, acrescimoCadastro, taxaFixaTiktok, lerCampo, gravarCampo, planoAds,
 } from './precificacaoMkt'
 
 const perto = (a: number | null, b: number, tol: number) => assert.ok(a != null && Math.abs(a - b) <= tol, `${a} ≠ ${b}`)
@@ -151,4 +151,20 @@ test('ler e gravar parâmetro por caminho não altera o original', () => {
   assert.equal(lerCampo(novo, 'ml.ads'), 0.1)
   assert.equal(lerCampo(C, 'ml.ads'), 0.092)
   assert.equal(lerCampo(gravarCampo(C, 'meta', 0.2), 'meta'), 0.2)
+})
+
+test('plano de Ads: sem Ads abaixo do piso; meta da Shopee corrigida pelo fator', () => {
+  // Kit Frutas 2 kg na Shopee a R$ 62,90 (custo 20,38), conta sem Ads
+  const sh = resultado('shopee', 62.9, { custo: 20.38, pesoKg: 2, adsShopee: 0 }, C)
+  const p = planoAds('shopee', sh, C)
+  assert.equal(p.cabe, true)
+  perto(p.adsMaximo, p.sobra - C.reservaAds, 0.0001)
+  perto(p.roasReal, 1 / p.adsMaximo, 0.0001)
+  perto(p.metaConfigurar, p.roasReal! / 0.75, 0.0001)
+  // chá avulso a R$ 23,90 (custo 6,50): sobra abaixo de 15% → sem Ads
+  const cha = planoAds('shopee', resultado('shopee', 23.9, { custo: 6.5, pesoKg: 0.1, adsShopee: 0 }, C), C)
+  assert.equal(cha.cabe, false); assert.equal(cha.metaConfigurar, null)
+  // no ML o fator é 1: meta = ROAS real
+  const ml = planoAds('ml', resultado('ml', 45, { ...e, adsML: 0 }, C), C)
+  perto(ml.metaConfigurar, ml.roasReal!, 0.0001)
 })
