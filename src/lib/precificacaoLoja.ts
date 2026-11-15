@@ -12,7 +12,7 @@ export interface ConfigLoja {
   taxaVariavel: number
   /** Meta de margem de contribuição (0.30) */
   meta: number
-  /** Piso por produto; abaixo disso é vermelho (0.18) */
+  /** Piso por produto; abaixo disso é vermelho (0.20) */
   minimo: number
   /** Zona de atenção por pacote (0.25) */
   atencao: number
@@ -23,9 +23,12 @@ export interface ConfigLoja {
   etiquetaExtra: number
 }
 
-/** Valores da aba CONFIGURAÇÕES em 15/11/2026. */
+/**
+ * Valores da aba CONFIGURAÇÕES em 15/11/2026, com a margem mínima de 20%
+ * definida pela Michele no mesmo dia (a planilha usava 18%).
+ */
 export const CONFIG_LOJA_PADRAO: ConfigLoja = {
-  imposto: 0.087, taxaVariavel: 0.0228, meta: 0.30, minimo: 0.18, atencao: 0.25, perda: 0.01,
+  imposto: 0.087, taxaVariavel: 0.0228, meta: 0.30, minimo: 0.20, atencao: 0.25, perda: 0.01,
   emb100: 0.50, emb250: 0.66, emb500: 0.90, emb1kg: 1.15, etiquetaExtra: 0,
 }
 

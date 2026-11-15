@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert'
-import { CONFIG_LOJA_PADRAO as C, analisar, gramaturas, promocoes, curvaAbc, precoIdeal } from './precificacaoLoja'
+import { CONFIG_LOJA_PADRAO, analisar, gramaturas, promocoes, curvaAbc, precoIdeal } from './precificacaoLoja'
+
+// A planilha foi feita com margem mínima de 18%; os testes de conferência usam esse valor.
+// O padrão do sistema é 20% (ideal 30%), definido pela Michele em 15/11/2026.
+const C = { ...CONFIG_LOJA_PADRAO, minimo: 0.18 }
 
 const perto = (a: number | null, b: number, tol = 0.0006) => assert.ok(a != null && Math.abs(a - b) <= tol, `${a} ≠ ${b}`)
 
@@ -64,6 +68,16 @@ test('abaixo da meta mas acima do mínimo é amarelo', () => {
   const a = analisar({ custo: 18, preco: 29, fracionado: true }, C)
   assert.equal(a.situacao, 'ABAIXO_DA_META')
   assert.equal(a.semaforo, 'AMARELO')
+})
+
+test('padrão do sistema: ideal 30% e mínimo 20% em loja e site', () => {
+  assert.equal(CONFIG_LOJA_PADRAO.meta, 0.30)
+  assert.equal(CONFIG_LOJA_PADRAO.minimo, 0.20)
+  // pimenta a R$ 33: com piso de 20% o desconto máximo cai de 17,5% para 15,1%
+  const a = analisar(pimenta, CONFIG_LOJA_PADRAO)
+  perto(a.descontoMaximo, 0.151, 0.001)
+  // pacote de 100 g tem 18,8% de margem: abaixo do mínimo de 20%, fica vermelho
+  assert.equal(gramaturas(18, 33, CONFIG_LOJA_PADRAO)[0].semaforo, 'VERMELHO')
 })
 
 test('curva ABC: A até ~80% do faturamento, B até ~95%, C o resto, sem venda é NOVO', () => {
