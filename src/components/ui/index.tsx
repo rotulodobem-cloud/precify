@@ -3,8 +3,10 @@ import { useEffect } from 'react'
 import { X, AlertCircle, CheckCircle2, AlertTriangle, MinusCircle } from 'lucide-react'
 
 // ── Modal ────────────────────────────────────────────────────
-export function Modal({ title, open, onClose, children, wide = false }: {
+export function Modal({ title, open, onClose, children, wide = false, fecharNoFundo = true }: {
   title: string; open: boolean; onClose: () => void; children: React.ReactNode; wide?: boolean
+  /** false = clicar fora não fecha (formulários longos, para não perder digitação) */
+  fecharNoFundo?: boolean
 }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -14,7 +16,7 @@ export function Modal({ title, open, onClose, children, wide = false }: {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={fecharNoFundo ? onClose : undefined} />
       <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-md'} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
           <h2 className="font-semibold text-gray-900">{title}</h2>

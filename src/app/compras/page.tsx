@@ -1,10 +1,11 @@
 'use client'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Search, RefreshCw, AlertTriangle, TrendingUp, TrendingDown, Minus, Users, BarChart2, ShoppingCart, Star, Calendar, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet, Pencil, Tag } from 'lucide-react'
+import { Plus, Search, RefreshCw, Lightbulb, ClipboardList, Send, Copy, TrendingUp, Users, BarChart2, ShoppingCart, Star, UserPlus, Package, Trash2, Building2, Download, Check, X, Upload, FileSpreadsheet, Pencil, Tag } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Modal, StatusBadge, Loading, Empty, Alert, Spinner } from '@/components/ui'
 import { useDebounce } from '@/lib/useDebounce'
+import SugestaoCompras from './SugestaoCompras'
 
 // ── Formatadores ─────────────────────────────────────────────
 const brl = (v?: number | null) =>
@@ -20,7 +21,11 @@ const num = (v?: number | null) =>
 const pct = (v?: number | null) => v != null ? `${(v * 100).toFixed(1)}%` : '—'
 const dt  = (d: string) => new Date(d).toLocaleDateString('pt-BR')
 
-type Aba = 'dashboard' | 'historico' | 'fornecedores' | 'ranking' | 'mensal' | 'melhor_preco' | 'hist_mensal' | 'curva' | 'pedido' | 'aliases'
+type Aba = 'sugestao' | 'historico' | 'fornecedores' | 'ranking' | 'melhor_preco' | 'curva' | 'pedido' | 'aliases'
+const ABAS_VALIDAS: Aba[] = ['sugestao', 'historico', 'fornecedores', 'ranking', 'melhor_preco', 'curva', 'pedido', 'aliases']
+// links antigos (?aba=dashboard, hist_mensal, mensal) caem na aba que absorveu a função
+const abaInicial = (v: string | null): Aba =>
+  v === 'mensal' ? 'curva' : ABAS_VALIDAS.includes(v as Aba) ? (v as Aba) : 'sugestao'
 
 interface Compra {
   id: string; dataCompra: string; skuPrincipal: string; nomeProduto: string; fornecedor: string
@@ -47,18 +52,25 @@ const emptyFormCompra = { dataCompra: new Date().toISOString().slice(0, 10), for
 
 const emptyForn = { nome: '', contato: '', obs: '' }
 
+// ── Rascunho automático do lançamento (fica no navegador) ─────
+const CHAVE_RASCUNHO = 'precify:compras:rascunho'
+const CHAVE_ULTIMO   = 'precify:compras:ultimo-lancamento'
+const CHAVE_PEDIDO   = 'precify:compras:pedido'
+interface UltimoLancamento { fornecedor: string; numeroNF: string; numeroPedido: string; qtdItens: number; total: number; em: string }
+const lerLocal = <T,>(chave: string): T | null => {
+  try { const v = localStorage.getItem(chave); return v ? JSON.parse(v) as T : null } catch { return null }
+}
+const gravarLocal = (chave: string, valor: unknown | null) => {
+  try { valor === null ? localStorage.removeItem(chave) : localStorage.setItem(chave, JSON.stringify(valor)) } catch { /* navegador sem storage */ }
+}
+const dataHora = (iso: string) => {
+  const d = new Date(iso)
+  const hoje = d.toDateString() === new Date().toDateString()
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return hoje ? `hoje às ${hora}` : `${d.toLocaleDateString('pt-BR')} às ${hora}`
+}
 
-// ── Tipos para lista de compras ───────────────────────────────
-interface HistoricoMensalItem {
-  skuPrincipal: string; nomeProduto: string; fornecedor: string
-  quantidade: number; custoUnitario: number; custoTotal: number
-  dataCompra: string; variacaoPct: number | null; custoAnterior: number | null
-  sugestao: string
-}
-interface HistoricoMensalData {
-  mes: string; totalGasto: number; totalItens: number
-  fornecedoresAtivos: number; comAumento: number; itens: HistoricoMensalItem[]
-}
+
 interface CurvaItem {
   sku: string; produto: string; curva: 'A' | 'B' | 'C'
   totalGasto: number; mediaGastoMes: number; qtdCompras: number
@@ -86,7 +98,7 @@ interface SugestaoForn {
 
 function ComprasContent() {
   const sp = useSearchParams()
-  const [aba, setAba]             = useState<Aba>((sp.get('aba') as Aba) || 'dashboard')
+  const [aba, setAba]             = useState<Aba>(abaInicial(sp.get('aba')))
   const [compras, setCompras]     = useState<Compra[]>([])
   const [dash, setDash]           = useState<DashCompras | null>(null)
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
@@ -121,7 +133,7 @@ function ComprasContent() {
   const [skuLoadingIdx, setSkuLoadingIdx] = useState<number | null>(null)
 
   // ── Estado das novas abas ─────────────────────────────────
-  const [histMensal, setHistMensal]   = useState<HistoricoMensalData | null>(null)
+  const [mesFiltro, setMesFiltro]     = useState('')
   const [curvaData, setCurvaData]     = useState<CurvaData | null>(null)
   const [aliases, setAliases]         = useState<AliasItem[]>([])
   const [pedido, setPedido]           = useState<PedidoItemLocal[]>([])
@@ -166,6 +178,47 @@ function ComprasContent() {
   }, [qBusca, fornFiltro, dataInicio, dataFim])
 
   useEffect(() => { load(); loadFornecedores() }, [load, loadFornecedores])
+
+  // ── Rascunho automático ───────────────────────────────────
+  const [rascunhoPronto, setRascunhoPronto]   = useState(false)
+  const [rascunhoSalvoEm, setRascunhoSalvoEm] = useState<string | null>(null)
+  const [ultimoLanc, setUltimoLanc]           = useState<UltimoLancamento | null>(null)
+
+  // recupera o que ficou digitado (fechou o modal, recarregou a página, caiu a internet…)
+  useEffect(() => {
+    const r = lerLocal<{ form: typeof emptyFormCompra; itens: typeof emptyItem[]; salvoEm: string }>(CHAVE_RASCUNHO)
+    if (r?.itens?.length) {
+      setFormCompra({ ...emptyFormCompra, ...r.form })
+      setItensCompra(r.itens)
+      setRascunhoSalvoEm(r.salvoEm)
+    }
+    setUltimoLanc(lerLocal<UltimoLancamento>(CHAVE_ULTIMO))
+    const ped = lerLocal<PedidoItemLocal[]>(CHAVE_PEDIDO)
+    if (Array.isArray(ped) && ped.length) setPedido(ped)
+    setRascunhoPronto(true)
+  }, [])
+
+  const itensPreenchidos = itensCompra.filter(it => it.skuPrincipal || it.nomeProduto || it.quantidade || it.custoTotal).length
+  const temRascunho = itensPreenchidos > 0 || !!formCompra.fornecedor || !!formCompra.numeroNF || !!formCompra.numeroPedido
+
+  // grava a cada alteração
+  useEffect(() => {
+    if (!rascunhoPronto) return
+    if (!temRascunho) { gravarLocal(CHAVE_RASCUNHO, null); setRascunhoSalvoEm(null); return }
+    const salvoEm = new Date().toISOString()
+    gravarLocal(CHAVE_RASCUNHO, { form: formCompra, itens: itensCompra, salvoEm })
+    setRascunhoSalvoEm(salvoEm)
+  }, [rascunhoPronto, temRascunho, formCompra, itensCompra])
+
+  // o pedido em montagem também sobrevive a fechar/recarregar a página
+  useEffect(() => {
+    if (rascunhoPronto) gravarLocal(CHAVE_PEDIDO, pedido.length ? pedido : null)
+  }, [rascunhoPronto, pedido])
+
+  const descartarRascunho = () => {
+    if (!confirm('Descartar tudo que foi digitado neste lançamento?')) return
+    setFormCompra(emptyFormCompra); setItensCompra([{ ...emptyItem }]); setSkuLookups({}); setError('')
+  }
 
   // ── Lookup de SKU ao digitar (por linha) ──────────────────
   const handleItemSkuChange = (idx: number, val: string) => {
@@ -244,6 +297,13 @@ function ComprasContent() {
         load()
         return
       }
+      const ultimo: UltimoLancamento = {
+        fornecedor: formCompra.fornecedor, numeroNF: formCompra.numeroNF, numeroPedido: formCompra.numeroPedido,
+        qtdItens: itensValidos.length,
+        total: itensValidos.reduce((s, it) => s + (parseFloat(it.custoTotal) || 0), 0),
+        em: new Date().toISOString(),
+      }
+      gravarLocal(CHAVE_ULTIMO, ultimo); setUltimoLanc(ultimo)
       setModal(false)
       setFormCompra(emptyFormCompra)
       setItensCompra([{ ...emptyItem }])
@@ -316,27 +376,34 @@ function ComprasContent() {
   const ff = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setFormForn(p => ({ ...p, [k]: e.target.value }))
 
-  const abas: { id: Aba; label: string; icon: React.ElementType; grupo?: string }[] = [
-    { id: 'dashboard',    label: 'Resumo',           icon: BarChart2 },
-    { id: 'historico',    label: 'Histórico',         icon: ShoppingCart },
+  const abas: { id: Aba; label: string; icon: React.ElementType }[] = [
+    { id: 'sugestao',     label: 'O que comprar',     icon: Lightbulb },
+    { id: 'pedido',       label: 'Montar pedido',     icon: ClipboardList },
+    { id: 'historico',    label: 'Lançamentos',       icon: ShoppingCart },
     { id: 'fornecedores', label: 'Por fornecedor',    icon: Users },
     { id: 'ranking',      label: 'Variação de preço', icon: TrendingUp },
-    { id: 'mensal',       label: 'Volume mensal',     icon: Calendar },
     { id: 'melhor_preco', label: 'Melhor preço',      icon: Star },
-    { id: 'hist_mensal',  label: 'Histórico mensal',  icon: Calendar,  grupo: 'lista' },
-    { id: 'curva',        label: 'Curva A/B/C',       icon: BarChart2, grupo: 'lista' },
-    { id: 'pedido',       label: 'Montar pedido',     icon: ShoppingCart, grupo: 'lista' },
-    { id: 'aliases',      label: 'Nomes fornecedor',  icon: Package,   grupo: 'lista' },
+    { id: 'curva',        label: 'Curva e volume',    icon: BarChart2 },
+    { id: 'aliases',      label: 'Nomes fornecedor',  icon: Package },
   ]
 
-  const limparFiltros = () => { setQ(''); setFornFiltro(''); setDataInicio(''); setDataFim('') }
+  const limparFiltros = () => { setQ(''); setFornFiltro(''); setDataInicio(''); setDataFim(''); setMesFiltro('') }
 
-  const loadHistMensal = useCallback(async () => {
-    setLoadingLista(true)
-    const r = await fetch('/api/compras/lista?tipo=historico')
-    setHistMensal(await r.json())
-    setLoadingLista(false)
-  }, [])
+  // filtro de mês preenche o período inteiro (substitui a antiga aba "Histórico mensal")
+  const escolherMes = (m: string) => {
+    setMesFiltro(m)
+    if (!m) { setDataInicio(''); setDataFim(''); return }
+    const [ano, mes] = m.split('-').map(Number)
+    const ultimoDia = new Date(ano, mes, 0).getDate()
+    setDataInicio(`${m}-01`); setDataFim(`${m}-${String(ultimoDia).padStart(2, '0')}`)
+  }
+  const resumoFiltro = {
+    total: compras.reduce((s, c) => s + c.custoTotal, 0),
+    produtos: new Set(compras.map(c => c.skuPrincipal)).size,
+    fornecedores: new Set(compras.map(c => c.fornecedor)).size,
+    comAumento: compras.filter(c => c.statusVariacao === 'AUMENTOU > 5%').length,
+  }
+  const volumePorSku = new Map((dash?.volumeMensal ?? []).map(v => [v.sku, v]))
 
   const loadCurva = useCallback(async () => {
     setLoadingLista(true)
@@ -353,10 +420,9 @@ function ComprasContent() {
   }, [])
 
   useEffect(() => {
-    if (aba === 'hist_mensal') loadHistMensal()
-    else if (aba === 'curva') loadCurva()
+    if (aba === 'curva') loadCurva()
     else if (aba === 'aliases') loadAliases()
-  }, [aba, loadHistMensal, loadCurva, loadAliases])
+  }, [aba, loadCurva, loadAliases])
 
   const buscarProduto = async () => {
     if (!buscaPedido.trim()) return
@@ -391,16 +457,25 @@ function ComprasContent() {
     setBuscaPedido(''); setBuscaRes(null); setSugestao(null); setFornSel(''); setQtdInput('')
   }
 
-  const exportarFornecedor = (forn: string, itens: PedidoItemLocal[]) => {
-    const data = new Date().toLocaleDateString('pt-BR')
-    let txt = `PEDIDO DE COMPRA — ${forn}\nData: ${data}\n${'─'.repeat(40)}\n\n`
-    itens.forEach(i => {
+  const textoPedido = (forn: string, itens: PedidoItemLocal[]) => {
+    const linhas = itens.map((i, n) => {
       const nome = i.nomeNoFornecedor || i.nomeProduto
-      const cod = i.codigoFornecedor ? ` (cod. ${i.codigoFornecedor})` : ''
-      txt += `• ${nome}${cod}: ${i.quantidade} ${i.unidade}\n`
+      const cod = i.codigoFornecedor ? ` (cód. ${i.codigoFornecedor})` : ''
+      return `${n + 1}. ${nome}${cod} — ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(i.quantidade)} ${i.unidade}`
     })
-    navigator.clipboard.writeText(txt)
-    alert('Lista copiada!')
+    return `*Pedido de compra — Rótulo do Bem*\nFornecedor: ${forn}\nData: ${new Date().toLocaleDateString('pt-BR')}\n\n${linhas.join('\n')}\n\nTotal: ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}`
+  }
+  const [copiado, setCopiado] = useState('')
+  const copiarPedido = async (forn: string, itens: PedidoItemLocal[]) => {
+    try { await navigator.clipboard.writeText(textoPedido(forn, itens)); setCopiado(forn); setTimeout(() => setCopiado(''), 2500) }
+    catch { alert('Não foi possível copiar. Use o botão do WhatsApp.') }
+  }
+  const enviarWhatsApp = (forn: string, itens: PedidoItemLocal[]) => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(textoPedido(forn, itens))}`, '_blank', 'noopener')
+  }
+  const alterarQtdPedido = (item: PedidoItemLocal, valor: string) => {
+    const q = parseFloat(valor.replace(',', '.'))
+    setPedido(p => p.map(x => x === item ? { ...x, quantidade: Number.isFinite(q) ? q : 0 } : x))
   }
 
   const salvarAlias = async () => {
@@ -485,110 +560,51 @@ function ComprasContent() {
           <button onClick={() => { setFormForn(emptyForn); setErrorForn(''); setModalForn(true) }} className="btn-ghost text-xs">
             <UserPlus size={13} /> Novo fornecedor
           </button>
-          <button onClick={() => { setFormCompra(emptyFormCompra); setItensCompra([{ ...emptyItem }]); setSkuLookups({}); setError(''); setModal(true) }} className="btn-primary">
-            <Plus size={14} /> Registrar compra
+          <button onClick={() => { setError(''); setModal(true) }} className="btn-primary">
+            {temRascunho
+              ? <><Pencil size={14} /> Continuar lançamento ({itensPreenchidos} {itensPreenchidos === 1 ? 'produto' : 'produtos'})</>
+              : <><Plus size={14} /> Registrar compra</>}
           </button>
         </div>
       </div>
 
+      {ultimoLanc && (
+        <div className="flex items-center gap-2 text-xs text-gray-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 w-fit">
+          <Check size={13} className="text-emerald-600 shrink-0" />
+          <span>
+            Último lançamento salvo: <strong>{ultimoLanc.fornecedor}</strong>
+            {ultimoLanc.numeroNF && <> · NF {ultimoLanc.numeroNF}</>}
+            {!ultimoLanc.numeroNF && ultimoLanc.numeroPedido && <> · Pedido {ultimoLanc.numeroPedido}</>}
+            {' '}· {ultimoLanc.qtdItens} {ultimoLanc.qtdItens === 1 ? 'produto' : 'produtos'} · {brl(ultimoLanc.total)} · {dataHora(ultimoLanc.em)}
+          </span>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
-        {abas.filter(a => !a.grupo).map(({ id, label, icon: Icon }) => (
+        {abas.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setAba(id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
               ${aba === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             <Icon size={13} /> {label}
-          </button>
-        ))}
-        <div className="w-px bg-gray-300 mx-1 self-stretch" />
-        {abas.filter(a => a.grupo === 'lista').map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setAba(id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-              ${aba === id ? 'bg-emerald-600 text-white shadow-sm' : 'text-emerald-700 hover:bg-emerald-50'}`}>
-            <Icon size={13} /> {label}
+            {id === 'pedido' && pedido.length > 0 && <span className="bg-rdb-600 text-white rounded-full px-1.5 text-[10px]">{pedido.length}</span>}
           </button>
         ))}
       </div>
 
-      {/* ── RESUMO ── */}
-      {aba === 'dashboard' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              ['Gasto total', brl(dash?.totalGasto), 'text-rdb-700'],
-              ['Total de compras', String(dash?.totalCompras ?? '—'), 'text-emerald-600'],
-              ['Fornecedores ativos', String(dash?.fornecedoresAtivos ?? '—'), 'text-amber-600'],
-              ['Margem média', pct(dash?.mediaMargemComPreco), 'text-blue-600'],
-            ].map(([label, value, cls]) => (
-              <div key={label} className="card p-4">
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className={`text-xl font-bold mt-1 ${cls}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-
-          {(dash?.ranking20 ?? []).filter(r => r.status === 'AUMENTOU > 5%').length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 text-red-800 font-semibold text-sm mb-2">
-                <AlertTriangle size={15} /> Custos que aumentaram mais de 5%
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {dash!.ranking20.filter(r => r.status === 'AUMENTOU > 5%').map(r => (
-                  <span key={r.sku} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                    {r.produto}: {brl(r.custoAnt)} → {brl(r.custoAtual)} (+{pct(r.variacaoPct)})
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="card p-4">
-            <h3 className="section-title mb-3">Gasto por fornecedor</h3>
-            <div className="space-y-2">
-              {(dash?.porFornecedor ?? []).slice(0, 10).map(fn => {
-                const pctTotal = dash?.totalGasto ? (fn.total / dash.totalGasto) * 100 : 0
-                return (
-                  <div key={fn.fornecedor} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-700 w-36 truncate">{fn.fornecedor}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div className="h-2 rounded-full bg-rdb-600 transition-all" style={{ width: `${pctTotal}%` }} />
-                    </div>
-                    <span className="text-xs font-semibold text-gray-700 w-28 text-right tabular-nums">{brl(fn.total)}</span>
-                    <span className="text-xs text-gray-400 w-14 text-right">{fn.qtdCompras}x</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {(dash?.prejudizo ?? []).length > 0 && (
-            <div className="card p-4">
-              <h3 className="section-title mb-1 text-perigo flex items-center gap-1.5">
-                <AlertTriangle size={14} /> Produtos com margem mais baixa
-              </h3>
-              <p className="text-xs text-tinta-fraca mb-3">Pelo custo da compra mais recente de cada produto</p>
-              <table className="w-full text-sm">
-                <thead className="tbl-head"><tr>
-                  <th className="th">SKU</th><th className="th">Produto</th>
-                  <th className="th-r">Custo</th><th className="th">Comprado em</th>
-                  <th className="th-r">Preço venda</th><th className="th-r">Margem</th>
-                </tr></thead>
-                <tbody>
-                  {dash!.prejudizo.slice(0, 10).map(p => (
-                    <tr key={p.sku} className="tr-row">
-                      <td className="td font-mono text-xs text-rdb-700">{p.sku}</td>
-                      <td className="td text-xs">{p.produto}</td>
-                      <td className="td-r text-xs">{brl(p.custoUnit)}</td>
-                      <td className="td text-xs text-tinta-fraca">{p.dataCompra ? dt(p.dataCompra) : '—'}</td>
-                      <td className="td-r text-xs">{brl(p.precoVenda)}</td>
-                      <td className="td-r text-xs font-bold text-perigo">{pct(p.margem)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+      {/* ── O QUE COMPRAR ── */}
+      {aba === 'sugestao' && (
+        <SugestaoCompras onAdicionar={novos => {
+          setPedido(p => {
+            const n = [...p]
+            for (const item of novos) {
+              const idx = n.findIndex(x => x.skuPrincipal === item.skuPrincipal && x.fornecedor === item.fornecedor)
+              if (idx >= 0) n[idx] = item; else n.push(item)
+            }
+            return n
+          })
+          setAba('pedido')
+        }} />
       )}
 
       {/* ── HISTÓRICO ── */}
@@ -610,16 +626,34 @@ function ComprasContent() {
             </div>
             {/* Filtro de período */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-gray-500 shrink-0">Período:</span>
-              <input type="date" className="inp-sm w-auto" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
+              <span className="text-xs text-gray-500 shrink-0">Mês:</span>
+              <input type="month" className="inp-sm w-auto" value={mesFiltro} onChange={e => escolherMes(e.target.value)} />
+              <span className="text-xs text-gray-500 shrink-0 ml-2">ou período:</span>
+              <input type="date" className="inp-sm w-auto" value={dataInicio} onChange={e => { setMesFiltro(''); setDataInicio(e.target.value) }} />
               <span className="text-xs text-gray-400">até</span>
-              <input type="date" className="inp-sm w-auto" value={dataFim} onChange={e => setDataFim(e.target.value)} />
+              <input type="date" className="inp-sm w-auto" value={dataFim} onChange={e => { setMesFiltro(''); setDataFim(e.target.value) }} />
               {(dataInicio || dataFim || fornFiltro || q) && (
                 <button onClick={limparFiltros} className="text-xs text-rdb-700 hover:underline">Limpar filtros</button>
               )}
               <span className="text-xs text-gray-400 ml-auto">{compras.length} registros</span>
             </div>
           </div>
+
+          {!loading && compras.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Total comprado (filtro atual)', valor: brl(resumoFiltro.total) },
+                { label: 'Produtos diferentes', valor: String(resumoFiltro.produtos) },
+                { label: 'Fornecedores', valor: String(resumoFiltro.fornecedores) },
+                { label: 'Itens com aumento acima de 5%', valor: String(resumoFiltro.comAumento), vermelho: resumoFiltro.comAumento > 0 },
+              ].map(k => (
+                <div key={k.label} className="card p-3">
+                  <div className="text-xs text-gray-500 mb-1">{k.label}</div>
+                  <div className={`text-lg font-semibold ${k.vermelho ? 'text-red-600' : 'text-gray-900'}`}>{k.valor}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="card-tight overflow-auto">
             <table className="w-full min-w-[800px]">
@@ -749,47 +783,6 @@ function ComprasContent() {
         </div>
       )}
 
-      {/* ── VOLUME MENSAL ── */}
-      {aba === 'mensal' && (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">Quanto de cada produto é comprado por mês em média.</p>
-          <div className="card-tight overflow-auto">
-            <table className="w-full">
-              <thead className="tbl-head"><tr>
-                <th className="th">SKU</th><th className="th">Produto</th>
-                <th className="th-r">Média/mês</th><th className="th-r">Meses ativos</th>
-                <th className="th">Distribuição</th>
-              </tr></thead>
-              <tbody className="divide-y divide-gray-50">
-                {loading && <Loading />}
-                {!loading && !dash?.volumeMensal.length && <Empty msg="Sem dados suficientes" />}
-                {(dash?.volumeMensal ?? []).slice(0, 30).map(v => {
-                  const meses = Object.entries(v.meses).sort()
-                  const maxVol = Math.max(...Object.values(v.meses), 1)
-                  return (
-                    <tr key={v.sku} className="tr-row">
-                      <td className="td font-mono text-xs font-bold text-rdb-700">{v.sku}</td>
-                      <td className="td text-sm">{v.produto}</td>
-                      <td className="td-r font-semibold">{new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(v.mediaMensal)}</td>
-                      <td className="td-r text-xs text-gray-500">{v.totalMeses}</td>
-                      <td className="td">
-                        <div className="flex items-end gap-0.5 h-8">
-                          {meses.map(([mes, vol]) => (
-                            <div key={mes} title={`${mes}: ${vol}`}
-                              className="bg-rdb-400 rounded-sm flex-1 min-w-[6px]"
-                              style={{ height: `${Math.max(15, (vol / maxVol) * 100)}%` }} />
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* ── MELHOR PREÇO ── */}
       {aba === 'melhor_preco' && (
         <div className="space-y-3">
@@ -838,93 +831,13 @@ function ComprasContent() {
         </div>
       )}
 
-      {/* ── HISTÓRICO MENSAL ── */}
-      {aba === 'hist_mensal' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Histórico do mês anterior</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Base para planejar as compras do próximo mês</p>
-            </div>
-          </div>
-          {loadingLista ? <Loading /> : !histMensal ? (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
-              Carregando dados do mês anterior...
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { label: `Total comprado (${histMensal.mes})`, valor: brl(histMensal.totalGasto) },
-                  { label: 'Produtos diferentes', valor: String(histMensal.totalItens) },
-                  { label: 'Fornecedores ativos', valor: String(histMensal.fornecedoresAtivos) },
-                  { label: 'Com aumento de preço', valor: String(histMensal.comAumento), vermelho: histMensal.comAumento > 0 },
-                ].map(k => (
-                  <div key={k.label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                    <div className="text-xs text-gray-500 mb-1">{k.label}</div>
-                    <div className={`text-xl font-semibold ${k.vermelho ? 'text-red-600' : 'text-gray-900'}`}>{k.valor}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="th">Produto</th>
-                      <th className="th">Fornecedor</th>
-                      <th className="th text-right">Qtd</th>
-                      <th className="th text-right">Custo unit.</th>
-                      <th className="th text-right">Variação</th>
-                      <th className="th">Sugestão</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {histMensal.itens.map((item, i) => (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="td">
-                          <div className="font-medium text-gray-900">{item.nomeProduto}</div>
-                          <div className="text-xs text-gray-400">SKU {item.skuPrincipal}</div>
-                        </td>
-                        <td className="td">
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.fornecedor || '—'}</span>
-                        </td>
-                        <td className="td text-right text-gray-700">{item.quantidade} kg</td>
-                        <td className="td text-right text-gray-700">{brl(item.custoUnitario)}</td>
-                        <td className="td text-right">
-                          {item.variacaoPct != null ? (
-                            <span className={`text-xs font-medium ${item.variacaoPct > 0.05 ? 'text-red-600' : item.variacaoPct < -0.05 ? 'text-green-600' : 'text-gray-500'}`}>
-                              {item.variacaoPct > 0 ? '▲' : item.variacaoPct < 0 ? '▼' : '='} {pct(Math.abs(item.variacaoPct))}
-                            </span>
-                          ) : <span className="text-gray-300 text-xs">—</span>}
-                        </td>
-                        <td className="td">
-                          <div className="flex items-center gap-1.5">
-                            {item.sugestao === 'revisar_aumento' ? <TrendingUp size={13} className="text-red-500" /> :
-                             item.sugestao === 'oportunidade' ? <TrendingDown size={13} className="text-green-600" /> :
-                             <Minus size={13} className="text-gray-400" />}
-                            <span className="text-xs text-gray-600">
-                              {item.sugestao === 'revisar_aumento' ? 'Preço subiu — revisar' :
-                               item.sugestao === 'oportunidade' ? 'Preço caiu' : 'Manter quantidade'}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* ── CURVA ABC ── */}
       {aba === 'curva' && (
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Curva A/B/C</h2>
-              <p className="text-xs text-gray-500">Produtos classificados por volume de gasto</p>
+              <h2 className="text-base font-semibold text-gray-900">Curva A/B/C e volume mensal</h2>
+              <p className="text-xs text-gray-500">Produtos classificados por gasto, com a quantidade média comprada por mês</p>
             </div>
             <select value={mesesCurva} onChange={e => setMesesCurva(e.target.value)}
               className="ml-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5">
@@ -969,8 +882,10 @@ function ComprasContent() {
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="th w-16">Curva</th>
                       <th className="th">Produto</th>
-                      <th className="th text-right">Média/mês</th>
+                      <th className="th text-right">Gasto médio/mês</th>
                       <th className="th text-right">% do total</th>
+                      <th className="th text-right">Qtd média/mês</th>
+                      <th className="th w-32">Compras por mês</th>
                       <th className="th">Fornecedor principal</th>
                       <th className="th">Outros</th>
                     </tr>
@@ -990,6 +905,25 @@ function ComprasContent() {
                         </td>
                         <td className="td text-right text-gray-700">{brl(item.mediaGastoMes)}</td>
                         <td className="td text-right text-gray-500 text-xs">{item.pctTotal}%</td>
+                        {(() => {
+                          const v = volumePorSku.get(item.sku)
+                          if (!v) return <><td className="td text-right text-gray-300 text-xs">—</td><td className="td" /></>
+                          const meses = Object.entries(v.meses).sort()
+                          const maxVol = Math.max(...Object.values(v.meses), 1)
+                          return (
+                            <>
+                              <td className="td text-right text-gray-700">{new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(v.mediaMensal)}</td>
+                              <td className="td">
+                                <div className="flex items-end gap-0.5 h-7">
+                                  {meses.map(([mes, vol]) => (
+                                    <div key={mes} title={`${mes}: ${vol}`} className="bg-rdb-400 rounded-sm flex-1 min-w-[5px]"
+                                      style={{ height: `${Math.max(15, (vol / maxVol) * 100)}%` }} />
+                                  ))}
+                                </div>
+                              </td>
+                            </>
+                          )
+                        })()}
                         <td className="td">
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.fornecedorPrincipal || '—'}</span>
                         </td>
@@ -1016,7 +950,7 @@ function ComprasContent() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-gray-900">Montar pedido de compra</h2>
-              <p className="text-xs text-gray-500">Busque produtos, o sistema sugere o fornecedor e monta a lista</p>
+              <p className="text-xs text-gray-500">Itens vindos de "O que comprar" ou adicionados aqui, separados por fornecedor e prontos para enviar</p>
             </div>
           </div>
 
@@ -1105,10 +1039,17 @@ function ComprasContent() {
           {/* Pedido agrupado */}
           {pedido.length === 0 ? (
             <div className="bg-gray-50 rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
-              Nenhum item no pedido ainda. Busque produtos acima para adicionar.
+              Nenhum item no pedido ainda. Marque produtos na aba <button className="text-rdb-700 underline" onClick={() => setAba('sugestao')}>O que comprar</button> ou busque acima.
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  <strong>{pedido.length}</strong> {pedido.length === 1 ? 'item' : 'itens'} · estimativa total{' '}
+                  <strong>{brl(pedido.reduce((s, i) => s + (i.precoUnitario || 0) * i.quantidade, 0))}</strong> pelos últimos preços
+                </span>
+                <button onClick={() => { if (confirm('Esvaziar o pedido inteiro?')) setPedido([]) }} className="text-xs text-red-600 hover:underline">Esvaziar pedido</button>
+              </div>
               {Object.entries(pedido.reduce<Record<string,PedidoItemLocal[]>>((acc, item) => {
                 if (!acc[item.fornecedor]) acc[item.fornecedor] = []
                 acc[item.fornecedor].push(item)
@@ -1117,21 +1058,26 @@ function ComprasContent() {
                 const total = itens.reduce((s, i) => s + (i.precoUnitario || 0) * i.quantidade, 0)
                 return (
                   <div key={forn} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100 flex-wrap gap-2">
                       <div className="flex items-center gap-2">
                         <Building2 size={16} className="text-gray-500" />
                         <span className="font-medium text-gray-800">{forn}</span>
                         <span className="text-xs text-gray-400">{itens.length} {itens.length === 1 ? 'item' : 'itens'}</span>
+                        {total > 0 && <span className="text-xs text-gray-600">· estimativa <strong>{brl(total)}</strong></span>}
                       </div>
                       <div className="flex items-center gap-2">
-                        {total > 0 && <span className="text-xs text-gray-500">Estimativa: {brl(total)}</span>}
-                        <button onClick={() => exportarFornecedor(forn, itens)}
-                          className="btn-ghost text-xs"><Download size={12} /> Copiar lista</button>
+                        <button onClick={() => copiarPedido(forn, itens)} className="btn-ghost text-xs">
+                          {copiado === forn ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar texto</>}
+                        </button>
+                        <button onClick={() => enviarWhatsApp(forn, itens)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-1.5">
+                          <Send size={12} /> Enviar no WhatsApp
+                        </button>
                       </div>
                     </div>
                     <div className="divide-y divide-gray-50">
                       {itens.map((item, i) => (
-                        <div key={i} className="grid grid-cols-[1fr_160px_80px_40px] gap-3 px-4 py-3 items-center hover:bg-gray-50/50">
+                        <div key={i} className="grid grid-cols-[1fr_170px_120px_110px_100px_32px] gap-3 px-4 py-2.5 items-center hover:bg-gray-50/50">
                           <div>
                             <div className="text-sm font-medium text-gray-800">{item.nomeProduto}</div>
                             <div className="text-xs text-gray-400">SKU {item.skuPrincipal}</div>
@@ -1141,11 +1087,17 @@ function ComprasContent() {
                               <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100">
                                 {item.nomeNoFornecedor}
                               </span>
-                            ) : <span className="text-xs text-gray-300">— sem alias</span>}
+                            ) : <span className="text-xs text-gray-300">— sem nome no fornecedor</span>}
                           </div>
-                          <div className="text-sm text-right text-gray-700">{item.quantidade} {item.unidade}</div>
+                          <div className="flex items-center gap-1 justify-end">
+                            <input className="inp-sm w-16 text-right" inputMode="decimal" defaultValue={item.quantidade}
+                              onBlur={e => alterarQtdPedido(item, e.target.value)} />
+                            <span className="text-xs text-gray-400 w-5">{item.unidade}</span>
+                          </div>
+                          <div className="text-xs text-right text-gray-500">{item.precoUnitario ? `${brl(item.precoUnitario)}/${item.unidade}` : 'sem preço'}</div>
+                          <div className="text-sm text-right text-gray-700">{item.precoUnitario ? brl(item.precoUnitario * item.quantidade) : '—'}</div>
                           <div className="flex justify-end">
-                            <button onClick={() => setPedido(p => p.filter((_, j) => j !== pedido.indexOf(item)))}
+                            <button onClick={() => setPedido(p => p.filter(x => x !== item))}
                               className="p-1 text-gray-300 hover:text-red-400"><Trash2 size={14} /></button>
                           </div>
                         </div>
@@ -1154,6 +1106,7 @@ function ComprasContent() {
                   </div>
                 )
               })}
+              <p className="text-xs text-gray-400">O texto enviado leva produto, código do fornecedor e quantidade — sem preços. O pedido fica guardado neste navegador até você esvaziar.</p>
             </div>
           )}
         </div>
@@ -1378,9 +1331,30 @@ function ComprasContent() {
       )}
 
       {/* ── MODAL REGISTRAR COMPRA ── */}
-      <Modal title="Registrar compra" open={modal} onClose={() => setModal(false)} wide>
+      <Modal title="Registrar compra" open={modal} onClose={() => setModal(false)} wide fecharNoFundo={false}>
         <div className="space-y-3">
           {error && <Alert type="error">{error}</Alert>}
+
+          {(rascunhoSalvoEm || ultimoLanc) && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 space-y-1">
+              {rascunhoSalvoEm && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5">
+                    <Check size={12} className="text-emerald-600" />
+                    Rascunho salvo automaticamente {dataHora(rascunhoSalvoEm)} — pode fechar ou recarregar a página sem perder nada.
+                  </span>
+                  <button onClick={descartarRascunho} className="text-red-600 hover:underline shrink-0">Descartar</button>
+                </div>
+              )}
+              {ultimoLanc && (
+                <div className="text-gray-500">
+                  Último lançamento salvo: <strong className="text-gray-700">{ultimoLanc.fornecedor}</strong>
+                  {ultimoLanc.numeroNF && <> · NF {ultimoLanc.numeroNF}</>}
+                  {' '}· {ultimoLanc.qtdItens} {ultimoLanc.qtdItens === 1 ? 'produto' : 'produtos'} · {dataHora(ultimoLanc.em)}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-4 gap-3">
             <div>
@@ -1475,7 +1449,7 @@ function ComprasContent() {
           </div>
 
           <div className="flex justify-end gap-2 pt-1">
-            <button className="btn-ghost" onClick={() => setModal(false)}>Cancelar</button>
+            <button className="btn-ghost" onClick={() => setModal(false)}>{temRascunho ? 'Fechar (mantém rascunho)' : 'Cancelar'}</button>
             <button className="btn-primary" onClick={save} disabled={saving}>
               {saving ? <Spinner size={13} /> : null} Registrar {itensCompra.length > 1 ? `(${itensCompra.length} produtos)` : ''}
             </button>

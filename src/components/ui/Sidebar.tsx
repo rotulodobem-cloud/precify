@@ -11,7 +11,6 @@ import type { Role } from '@/lib/auth'
 
 const links = [
   { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
-  { href: '/busca',          label: 'Busca por SKU',   icon: Search },
   { divider: true,           label: 'Precificação' },
   { href: '/precificacao-multicanal', label: 'Multicanal RdB', icon: Leaf },
   { href: '/precos-praticados', label: 'Preços praticados', icon: Percent },
