@@ -15,6 +15,8 @@ export interface ConfigMkt {
   piso: number
   /** desconto da promoção que leva do preço de cadastro ao preço de venda (0.30 = 30% off) */
   descontoPromocao: number
+  /** sobra que precisa ficar depois do Ads, em pontos do preço (0.08 = 8 pontos) */
+  reservaAds: number
   ml: {
     comissao: number
     ads: number
@@ -58,7 +60,7 @@ export interface ConfigMkt {
 
 /** Valores da aba MKT CONFIG em 15/11/2026. */
 export const CONFIG_MKT_PADRAO: ConfigMkt = {
-  imposto: 0.087, meta: 0.25, piso: 0.15, descontoPromocao: 0.30,
+  imposto: 0.087, meta: 0.25, piso: 0.15, descontoPromocao: 0.30, reservaAds: 0.08,
   ml: { comissao: 0.14, ads: 0.092, embalagem: 0.90, coleta: 0.60, armazenagem: 0, tetoEnvio: 0.25, tetoAte: 29 },
   shopee: { comissao: 0.186, ads: 0.203, servico: 0.05, transacao: 0.014, afiliados: 0.024, devolucao: 0.49, embalagem: 1.50, frete: 1.22, freteDireta: 3.99 },
   // TikTok: taxas herdadas da calculadora anterior do Precify; Ads sem histórico, começa em zero
@@ -71,6 +73,7 @@ export const CAMPOS_CONFIG_MKT: { grupo: string; campos: { caminho: string; rotu
     { caminho: 'meta', rotulo: 'Meta de margem', tipo: 'pct' },
     { caminho: 'piso', rotulo: 'Piso de margem', tipo: 'pct' },
     { caminho: 'descontoPromocao', rotulo: 'Desconto da promoção (cadastro → venda)', tipo: 'pct' },
+    { caminho: 'reservaAds', rotulo: 'Sobra mínima depois do Ads', tipo: 'pct' },
   ] },
   { grupo: 'Mercado Livre Full Super', campos: [
     { caminho: 'ml.comissao', rotulo: 'Comissão', tipo: 'pct' },
@@ -179,6 +182,14 @@ export interface ResultadoMkt {
   margem: number
   margemPct: number
   semaforo: Semaforo
+  /** Ads usado na conta, como fração do preço */
+  adsPct: number
+  /** sobra antes de descontar o Ads, como fração do preço */
+  sobraAntesAds: number
+  /** maior Ads que ainda deixa a reserva: sobra antes do Ads − reserva (nunca negativo) */
+  adsMaximo: number
+  /** ROAS mínimo para o Ads caber: 1 ÷ Ads máximo; null quando não cabe Ads nenhum */
+  roasMinimo: number | null
 }
 
 const fixosML = (c: ConfigMkt) => c.ml.embalagem + c.ml.coleta + c.ml.armazenagem
@@ -231,7 +242,13 @@ export function resultado(canal: Canal, preco: number, e: EntradaMkt, c: ConfigM
       ]
   const margem = preco - linhas.reduce((s, l) => s + l.valor, 0)
   const margemPct = preco > 0 ? margem / preco : 0
-  return { preco, linhas, margem, margemPct, semaforo: semaforo(margemPct, c) }
+  const adsPct = preco > 0 ? (linhas.find(l => l.rotulo === 'Ads')?.valor ?? 0) / preco : 0
+  const sobraAntesAds = margemPct + adsPct
+  const adsMaximo = Math.max(0, sobraAntesAds - c.reservaAds)
+  return {
+    preco, linhas, margem, margemPct, semaforo: semaforo(margemPct, c),
+    adsPct, sobraAntesAds, adsMaximo, roasMinimo: adsMaximo > 1e-9 ? 1 / adsMaximo : null,
+  }
 }
 
 export interface FaixaPreco {

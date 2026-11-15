@@ -123,6 +123,23 @@ test('kit: custo e peso multiplicam, taxas por pedido não — o preço por unid
   assert.ok(tres / 3 < um, `${tres / 3} deveria ser menor que ${um}`)
 })
 
+test('Ads máximo: sobra antes do Ads menos 8 pontos, e o ROAS mínimo que isso exige', () => {
+  // ML a R$ 45: margem 22,5% com Ads de 9,2% → sobra antes do Ads 31,7% → Ads máximo 23,7% → ROAS 4,2
+  const r = resultado('ml', 45, e, C)
+  perto(r.adsPct, 0.092, 0.0001)
+  perto(r.sobraAntesAds, r.margemPct + 0.092, 0.0001)
+  perto(r.adsMaximo, r.sobraAntesAds - 0.08, 0.0001)
+  perto(r.roasMinimo, 1 / r.adsMaximo, 0.0001)
+  perto(r.adsMaximo, 0.237, 0.002)
+  // o Ads máximo não depende do Ads que está sendo usado
+  perto(resultado('ml', 45, { ...e, adsML: 0 }, C).adsMaximo, r.adsMaximo, 0.0001)
+  // Shopee a R$ 45 dá prejuízo mesmo sem Ads: não cabe Ads nenhum
+  const s = resultado('shopee', 45, e, C)
+  assert.equal(s.adsMaximo > 0.08, false)
+  const semSobra = resultado('shopee', 30, e, C)
+  assert.equal(semSobra.adsMaximo, 0); assert.equal(semSobra.roasMinimo, null)
+})
+
 test('comissão e Ads do anúncio substituem o padrão', () => {
   const r = resultado('ml', 45, { ...e, comissaoML: 0.19, adsML: 0 }, C)
   const v = Object.fromEntries(r.linhas.map(l => [l.rotulo, l.valor]))

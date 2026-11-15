@@ -106,7 +106,15 @@ function PainelCanal({ canal, entrada, precoTeste, cfg, unidades }: { canal: Can
                   <td className="td-r text-xs text-tinta-fraca">{pct(l.valor / r.preco)}</td>
                 </tr>
               ))}
-              <tr><td className="td font-semibold whitespace-normal">Margem de contribuição</td><td className={`td-r font-bold ${COR_TXT[r.semaforo]}`}>{brl(r.margem)}</td><td className={`td-r text-xs font-semibold ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</td></tr>
+              <tr className="tr-row"><td className="td font-semibold whitespace-normal">Margem de contribuição</td><td className={`td-r font-bold ${COR_TXT[r.semaforo]}`}>{brl(r.margem)}</td><td className={`td-r text-xs font-semibold ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</td></tr>
+              <tr>
+                <td className="td whitespace-normal">
+                  <span className="font-semibold">Ads máximo</span>
+                  <div className="text-[10px] text-tinta-fraca">sobra antes do Ads ({pct(r.sobraAntesAds)}) menos {pct(cfg.reservaAds, 0)}{r.roasMinimo != null && <> · ROAS mínimo <strong className="text-tinta">{r.roasMinimo.toFixed(1).replace('.', ',')}</strong></>}</div>
+                </td>
+                <td className="td-r font-bold">{r.adsMaximo > 0 ? brl(r.adsMaximo * r.preco) : '—'}</td>
+                <td className={`td-r text-xs font-semibold ${r.adsMaximo <= 0 ? 'text-perigo' : r.adsPct > r.adsMaximo + 1e-9 ? 'text-atencao' : 'text-ok'}`}>{r.adsMaximo > 0 ? pct(r.adsMaximo) : 'não cabe'}</td>
+              </tr>
             </tbody>
           </table>
 
