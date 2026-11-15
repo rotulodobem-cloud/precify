@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Search, Settings2, X, ChevronDown, Megaphone } from 'lucide-react'
 import { Spinner, Alert } from '@/components/ui'
 import {
-  CONFIG_MKT_PADRAO, CAMPOS_CONFIG_MKT, resultado, precoParaMargem, precoCadastro, descontoPromocao,
+  CONFIG_MKT_PADRAO, CAMPOS_CONFIG_MKT, resultado, precoParaMargem, precoCadastro, acrescimoCadastro,
   lerCampo, gravarCampo, type ConfigMkt, type Canal, type Semaforo, type EntradaMkt,
 } from '@/lib/precificacaoMkt'
 
@@ -21,7 +21,7 @@ const COR: Record<Semaforo, string> = {
   VERDE: 'bg-ok/10 text-ok border-ok/30', AMARELO: 'bg-atencao/10 text-atencao border-atencao/30', VERMELHO: 'bg-perigo/10 text-perigo border-perigo/30',
 }
 const COR_TXT: Record<Semaforo, string> = { VERDE: 'text-ok', AMARELO: 'text-atencao', VERMELHO: 'text-perigo' }
-const NOME: Record<Canal, string> = { ml: 'Mercado Livre Full Super', shopee: 'Shopee' }
+const NOME: Record<Canal, string> = { ml: 'Mercado Livre Full Super', shopee: 'Shopee', tiktok: 'TikTok Shop' }
 
 function PainelCanal({ canal, entrada, precoTeste, cfg }: { canal: Canal; entrada: EntradaMkt | null; precoTeste: number | null; cfg: ConfigMkt }) {
   const [abrir, setAbrir] = useState(false)
@@ -44,7 +44,7 @@ function PainelCanal({ canal, entrada, precoTeste, cfg }: { canal: Canal; entrad
         <p className="p-6 text-sm text-perigo">Com essas taxas não existe preço que entregue a meta de {pct(cfg.meta, 0)}: comissão, Ads, imposto e margem somam mais que o preço. Revise Ads ou a meta em Parâmetros.</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-px bg-rdb-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-px bg-rdb-100">
             <div className="bg-white p-4">
               <div className="text-[11px] text-tinta-fraca">{precoTeste != null ? 'Margem no preço testado' : 'Margem no preço ideal'}</div>
               <div className={`text-3xl font-bold font-titulo tabular-nums ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</div>
@@ -103,7 +103,7 @@ function PainelCanal({ canal, entrada, precoTeste, cfg }: { canal: Canal; entrad
                 </tbody>
               </table>
               <p className="text-[11px] text-tinta-fraca px-4 py-2">
-                {canal === 'ml' ? 'O envio do Full Super' : 'A taxa fixa da Shopee'} muda conforme a faixa de preço. Vale o menor preço que cai dentro da própria faixa; quando a conta dá abaixo do início da faixa, vale o início.
+                {canal === 'ml' ? 'O envio do Full Super' : canal === 'shopee' ? 'A taxa fixa da Shopee' : 'A comissão e a taxa fixa do TikTok'} muda conforme a faixa de preço. Vale o menor preço que cai dentro da própria faixa; quando a conta dá abaixo do início da faixa, vale o início.
               </p>
             </div>
           )}
@@ -129,6 +129,7 @@ function Conteudo() {
   const [comissaoTxt, setComissaoTxt] = useState('')
   const [adsMlTxt, setAdsMlTxt] = useState('')
   const [adsShTxt, setAdsShTxt] = useState('')
+  const [adsTtTxt, setAdsTtTxt] = useState('')
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState(false)
@@ -169,6 +170,7 @@ function Conteudo() {
     comissaoML: num(comissaoTxt) != null ? num(comissaoTxt)! / 100 : undefined,
     adsML: num(adsMlTxt) != null ? num(adsMlTxt)! / 100 : undefined,
     adsShopee: num(adsShTxt) != null ? num(adsShTxt)! / 100 : undefined,
+    adsTiktok: num(adsTtTxt) != null ? num(adsTtTxt)! / 100 : undefined,
   } : null
 
   const abrirConfig = () => {
@@ -194,14 +196,13 @@ function Conteudo() {
     finally { setSalvando(false) }
   }
 
-  const desc = descontoPromocao(cfg)
 
   return (
-    <div className="space-y-4 max-w-6xl">
+    <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="page-title">Precificar — marketplaces</h1>
-          <p className="text-sm text-tinta-fraca mt-0.5">Mercado Livre Full Super e Shopee: quanto sobra em cada um e a que preço cadastrar o anúncio</p>
+          <p className="text-sm text-tinta-fraca mt-0.5">Mercado Livre Full Super, Shopee e TikTok Shop: quanto sobra em cada um e a que preço cadastrar o anúncio</p>
         </div>
         <div className="flex gap-2">
           <Link href="/painel-marketplaces" className="btn-ghost text-xs">Painel de marketplaces</Link>
@@ -214,8 +215,8 @@ function Conteudo() {
       <div className="flex items-start gap-3 rounded-xl border border-rdb-200 bg-rdb-50 px-4 py-3 text-sm text-tinta">
         <Megaphone size={16} className="text-rdb-700 mt-0.5 shrink-0" />
         <span>
-          <strong>Estratégia de cadastro:</strong> o anúncio sobe {pct(cfg.acrescimoCadastro, 0)} acima do preço de venda e depois entra em promoção de {pct(desc)} para voltar a ele.
-          As taxas e a margem são calculadas sobre o preço que o cliente paga (em promoção). Ao lado de cada preço aparece o valor para cadastrar.
+          <strong>Estratégia de cadastro:</strong> o anúncio sobe com o preço cheio e entra em promoção de {pct(cfg.descontoPromocao, 0)}, chegando ao preço de venda
+          (o preço cheio fica {pct(acrescimoCadastro(cfg))} acima). As taxas e a margem são calculadas sobre o preço que o cliente paga, em promoção. Ao lado de cada preço aparece o valor para cadastrar.
         </span>
       </div>
 
@@ -304,16 +305,21 @@ function Conteudo() {
             <label className="lbl">Ads na Shopee (% do preço)</label>
             <input className="inp" inputMode="decimal" value={adsShTxt} onChange={e => setAdsShTxt(e.target.value)} placeholder={txt(cfg.shopee.ads * 100)} />
           </div>
+          <div>
+            <label className="lbl">Ads no TikTok (% do preço)</label>
+            <input className="inp" inputMode="decimal" value={adsTtTxt} onChange={e => setAdsTtTxt(e.target.value)} placeholder={txt(cfg.tiktok.ads * 100)} />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
         <PainelCanal canal="ml" entrada={entrada} precoTeste={precoTeste} cfg={cfg} />
         <PainelCanal canal="shopee" entrada={entrada} precoTeste={precoTeste} cfg={cfg} />
+        <PainelCanal canal="tiktok" entrada={entrada} precoTeste={precoTeste} cfg={cfg} />
       </div>
 
       <p className="text-xs text-tinta-fraca">
-        Mercado Livre por agência e TikTok Shop ainda não estão nesta calculadora. A calculadora anterior continua disponível em{' '}
+        As taxas do TikTok são as que o Precify já usava (comissão de 10% e R$ 4 abaixo de R$ 50; 6% e R$ 6 acima; 6% de outras taxas) e o Ads começa em zero: confira em Parâmetros. Mercado Livre por agência ainda não está nesta calculadora. A calculadora anterior continua disponível em{' '}
         <Link href="/precificacao-multicanal" className="text-rdb-700 underline">multicanal (versão antiga)</Link>, porque os cálculos salvos nela alimentam o Farol.
       </p>
     </div>

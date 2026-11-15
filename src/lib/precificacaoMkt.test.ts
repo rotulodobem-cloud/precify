@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert'
 import {
   CONFIG_MKT_PADRAO as C, resultado, precoParaMargem, envioML, taxaFixaShopee,
-  precoCadastro, descontoPromocao, lerCampo, gravarCampo,
+  precoCadastro, acrescimoCadastro, taxaFixaTiktok, lerCampo, gravarCampo,
 } from './precificacaoMkt'
 
 const perto = (a: number | null, b: number, tol: number) => assert.ok(a != null && Math.abs(a - b) <= tol, `${a} ≠ ${b}`)
@@ -74,10 +74,35 @@ test('taxas somando mais de 100% com a margem: não existe preço', () => {
   assert.equal(r.preco, null)
 })
 
-test('estratégia de cadastro: sobe 30% acima e a promoção de 23,1% volta ao preço de venda', () => {
-  perto(precoCadastro(100, C), 130, 0.0001)
-  perto(descontoPromocao(C), 0.2308, 0.0001)
-  perto(precoCadastro(100, C) * (1 - descontoPromocao(C)), 100, 0.0001)
+test('estratégia de cadastro: o preço cheio com 30% de desconto chega ao preço de venda', () => {
+  perto(precoCadastro(47.56, C), 67.94, 0.005)
+  perto(precoCadastro(100, C) * (1 - C.descontoPromocao), 100, 0.0001)
+  perto(acrescimoCadastro(C), 0.4286, 0.0001)
+})
+
+test('TikTok: comissão e taxa fixa mudam na faixa de R$ 50', () => {
+  const baixa = resultado('tiktok', 45, e, C)
+  const v = Object.fromEntries(baixa.linhas.map(l => [l.rotulo, l.valor]))
+  perto(v['Comissão'], 4.50, 0.005); assert.equal(v['Taxa fixa por item'], 4)
+  perto(v['Afiliados e outras taxas'], 2.70, 0.005); assert.equal(v['Ads'], 0)
+  // 45 − 16 − 4,50 − 4 − 2,70 − 3,915 − 0 − 1,50
+  perto(baixa.margem, 12.385, 0.005)
+  const alta = Object.fromEntries(resultado('tiktok', 60, e, C).linhas.map(l => [l.rotulo, l.valor]))
+  perto(alta['Comissão'], 3.60, 0.005); assert.equal(alta['Taxa fixa por item'], 6)
+  assert.deepEqual([49.99, 50].map(p => taxaFixaTiktok(p, C)), [4, 6])
+})
+
+test('TikTok: o preço ideal entrega a meta e respeita a faixa', () => {
+  const ideal = precoParaMargem('tiktok', C.meta, e, C)
+  // faixa baixa: (16 + 1,50 + 4) / (1 − 0,10 − 0,06 − 0,087 − 0,25) = 42,74, dentro da faixa
+  perto(ideal.preco, 42.74, 0.01)
+  perto(resultado('tiktok', ideal.preco!, e, C).margemPct, C.meta, 0.0005)
+  // no preço ideal o semáforo é verde nos três canais, mesmo com arredondamento
+  for (const canal of ['ml', 'shopee', 'tiktok'] as const) assert.equal(resultado(canal, precoParaMargem(canal, C.meta, e, C).preco!, e, C).semaforo, 'VERDE')
+  // produto caro cai na faixa alta, com comissão menor
+  const caro = precoParaMargem('tiktok', C.meta, { custo: 40, pesoKg: 1 }, C)
+  assert.ok(caro.preco! >= 50)
+  perto(resultado('tiktok', caro.preco!, { custo: 40, pesoKg: 1 }, C).margemPct, C.meta, 0.0005)
 })
 
 test('comissão e Ads do anúncio substituem o padrão', () => {
