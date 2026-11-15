@@ -12,3 +12,8 @@ export function origemPublica(req: NextRequest): string {
 }
 
 export const CAMINHO_RETORNO = '/api/shopee/callback'
+
+/** Cookie que amarra a autorização ao navegador que a iniciou (proteção contra retorno forjado). */
+export const COOKIE_ESTADO = 'shopee_oauth_state'
+/** Tempo para concluir o login na Shopee e voltar */
+export const VALIDADE_ESTADO_S = 15 * 60
