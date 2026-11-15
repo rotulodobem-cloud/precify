@@ -23,7 +23,7 @@ const COR: Record<Semaforo, string> = {
 const COR_TXT: Record<Semaforo, string> = { VERDE: 'text-ok', AMARELO: 'text-atencao', VERMELHO: 'text-perigo' }
 const NOME: Record<Canal, string> = { ml: 'Mercado Livre Full Super', shopee: 'Shopee', tiktok: 'TikTok Shop' }
 
-function PainelCanal({ canal, entrada, precoTeste, cfg, unidades }: { canal: Canal; entrada: EntradaMkt | null; precoTeste: number | null; cfg: ConfigMkt; unidades: number }) {
+function PainelCanal({ canal, entrada, precoTeste, cfg, unidades, vendasDia }: { canal: Canal; entrada: EntradaMkt | null; precoTeste: number | null; cfg: ConfigMkt; unidades: number; vendasDia: number | null }) {
   const [abrir, setAbrir] = useState(false)
   if (!entrada) {
     return <div className="card p-6 text-sm text-tinta-fraca text-center"><h2 className="section-title mb-2 text-tinta">{NOME[canal]}</h2>Informe o custo do item para calcular.</div>
@@ -118,6 +118,31 @@ function PainelCanal({ canal, entrada, precoTeste, cfg, unidades }: { canal: Can
             </tbody>
           </table>
 
+          <div className="px-4 py-3 border-t border-rdb-100 bg-rdb-50/60">
+            <div className="text-[11px] font-semibold text-tinta mb-2">O que configurar no Ads deste anúncio</div>
+            {r.adsPct <= 0 ? (
+              <p className="text-xs text-tinta-fraca">Esta conta está sem Ads. Preencha o percentual de Ads do canal para ver a meta de ROAS e a verba.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Meta de ROAS</div>
+                  <div className="text-lg font-bold font-titulo tabular-nums text-rdb-700 leading-tight">{(1 / r.adsPct).toFixed(1).replace('.', ',')}</div>
+                  <div className="text-[10px] text-tinta-fraca">1 ÷ {pct(r.adsPct)} de Ads{r.roasMinimo != null && <> · nunca abaixo de {r.roasMinimo.toFixed(1).replace('.', ',')}</>}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Ads por venda</div>
+                  <div className="text-lg font-bold font-titulo tabular-nums text-tinta leading-tight">{brl(r.adsPct * r.preco)}</div>
+                  <div className="text-[10px] text-tinta-fraca">quanto pode gastar para vender 1 anúncio</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Verba diária</div>
+                  <div className="text-lg font-bold font-titulo tabular-nums text-tinta leading-tight">{vendasDia ? brl(r.adsPct * r.preco * vendasDia) : '—'}</div>
+                  <div className="text-[10px] text-tinta-fraca">{vendasDia ? `para ${String(vendasDia).replace('.', ',')} venda(s) por dia` : 'informe as vendas por dia acima'}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button onClick={() => setAbrir(a => !a)} className="w-full flex items-center justify-between px-4 py-2 text-xs text-tinta-fraca hover:bg-rdb-50 border-t border-rdb-100">
             Como o preço ideal foi achado, por faixa de preço <ChevronDown size={13} className={abrir ? 'rotate-180 transition-transform' : 'transition-transform'} />
           </button>
@@ -170,6 +195,7 @@ function Conteudo() {
   const [adsShTxt, setAdsShTxt] = useState('')
   const [adsTtTxt, setAdsTtTxt] = useState('')
   const [unidades, setUnidades] = useState(1)
+  const [vendasDiaTxt, setVendasDiaTxt] = useState('')
   const [entrega, setEntrega] = useState<'media' | 'padrao' | 'direta'>('media')
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
@@ -207,6 +233,7 @@ function Conteudo() {
   const custo = num(custoTxt) ?? custoAuto
   const pesoKg = num(pesoTxt) ?? (item ? (item.fracionado ? fator : 0.3) * unidades : unidades)
   const precoTeste = num(vendaTxt)
+  const vendasDia = num(vendasDiaTxt) || null
   const entrada: EntradaMkt | null = custo != null && custo > 0 ? {
     custo, pesoKg,
     comissaoML: num(comissaoTxt) != null ? num(comissaoTxt)! / 100 : undefined,
@@ -361,6 +388,10 @@ function Conteudo() {
             <input className="inp" inputMode="decimal" value={adsShTxt} onChange={e => setAdsShTxt(e.target.value)} placeholder={txt(cfg.shopee.ads * 100)} />
           </div>
           <div>
+            <label className="lbl">Vendas por dia que você espera</label>
+            <input className="inp" inputMode="decimal" value={vendasDiaTxt} onChange={e => setVendasDiaTxt(e.target.value)} placeholder="ex.: 3 (para calcular a verba)" />
+          </div>
+          <div>
             <label className="lbl">Entrega na Shopee</label>
             <select className="inp" value={entrega} onChange={e => setEntrega(e.target.value as 'media' | 'padrao' | 'direta')}>
               <option value="media">Média dos pedidos ({brl(cfg.shopee.frete)})</option>
@@ -376,9 +407,9 @@ function Conteudo() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-        <PainelCanal canal="ml" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} />
-        <PainelCanal canal="shopee" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} />
-        <PainelCanal canal="tiktok" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} />
+        <PainelCanal canal="ml" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} vendasDia={vendasDia} />
+        <PainelCanal canal="shopee" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} vendasDia={vendasDia} />
+        <PainelCanal canal="tiktok" entrada={entrada} precoTeste={precoTeste} cfg={cfg} unidades={unidades} vendasDia={vendasDia} />
       </div>
 
       <p className="text-xs text-tinta-fraca">
