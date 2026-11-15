@@ -26,6 +26,25 @@ const COR: Record<Semaforo, string> = {
 const COR_TXT: Record<Semaforo, string> = { VERDE: 'text-ok', AMARELO: 'text-atencao', VERMELHO: 'text-perigo' }
 const NOME: Record<Canal, string> = { ml: 'Mercado Livre Full Super', shopee: 'Shopee', tiktok: 'TikTok Shop' }
 
+const SITUACAO: Record<Semaforo, string> = { VERDE: 'Margem boa', AMARELO: 'Margem apertada', VERMELHO: 'Abaixo do mínimo' }
+
+function Passo({ n, titulo, children, tom = 'neutro' }: { n: number; titulo: string; children: React.ReactNode; tom?: 'neutro' | 'verde' | 'vermelho' | 'destaque' }) {
+  const cls = {
+    neutro: 'border-rdb-100 bg-white', destaque: 'border-rdb-300 bg-rdb-50',
+    verde: 'border-ok/40 bg-ok/5', vermelho: 'border-perigo/40 bg-perigo/5',
+  }[tom]
+  const bola = { neutro: 'bg-rdb-700', destaque: 'bg-rdb-700', verde: 'bg-ok', vermelho: 'bg-perigo' }[tom]
+  return (
+    <div className={`rounded-xl border-2 p-3 ${cls}`}>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className={`w-5 h-5 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0 ${bola}`}>{n}</span>
+        <span className="text-xs font-semibold text-tinta">{titulo}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
 function PainelCanal({ canal, entrada, precoTeste, cfg, unidades, vendasDia }: { canal: Canal; entrada: EntradaMkt | null; precoTeste: number | null; cfg: ConfigMkt; unidades: number; vendasDia: number | null }) {
   const [abrir, setAbrir] = useState(false)
   if (!entrada) {
@@ -33,6 +52,7 @@ function PainelCanal({ canal, entrada, precoTeste, cfg, unidades, vendasDia }: {
   }
   const ideal = precoParaMargem(canal, cfg.meta, entrada, cfg)
   const piso = precoParaMargem(canal, cfg.piso, entrada, cfg)
+  const testando = precoTeste != null
   const preco = precoTeste ?? ideal.preco
   const r = preco != null ? resultado(canal, preco, entrada, cfg) : null
   const ads = r ? planoAds(canal, r, cfg) : null
@@ -41,146 +61,132 @@ function PainelCanal({ canal, entrada, precoTeste, cfg, unidades, vendasDia }: {
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-rdb-100 flex items-center justify-between">
         <h2 className="section-title">{NOME[canal]}</h2>
-        {r && <span className={`text-[11px] font-semibold rounded-full border px-2 py-0.5 ${COR[r.semaforo]}`}>{r.semaforo}</span>}
+        {r && <span className={`text-[11px] font-semibold rounded-full border px-2 py-0.5 ${COR[r.semaforo]}`}>{SITUACAO[r.semaforo]}</span>}
       </div>
 
-      {!r ? (
+      {!r || !ads ? (
         <p className="p-6 text-sm text-perigo">Com essas taxas não existe preço que entregue a meta de {pct(cfg.meta, 0)}: comissão, imposto e margem somam mais que o preço. Revise a meta em Parâmetros.</p>
       ) : (
         <>
-          {/* O que fazer no anúncio: preço cheio para cadastrar e preço em promoção */}
-          <div className="p-4 space-y-2">
-            {[
-              { rotulo: `Para a meta de ${pct(cfg.meta, 0)}`, p: ideal.preco, forte: true },
-              { rotulo: `No mínimo de ${pct(cfg.piso, 0)}`, p: piso.preco, forte: false },
-            ].map(l => (
-              <div key={l.rotulo} className={`rounded-xl border p-3 ${l.forte ? 'border-rdb-300 bg-rdb-50' : 'border-rdb-100 bg-white'}`}>
-                <div className="text-[11px] font-semibold text-tinta mb-1.5">{l.rotulo}</div>
-                {l.p == null ? <div className="text-sm text-perigo">não existe preço com essas taxas</div> : (
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Cadastrar o anúncio por</div>
-                      <div className={`tabular-nums font-bold font-titulo leading-tight ${l.forte ? 'text-2xl text-rdb-700' : 'text-lg text-tinta'}`}>{brl(precoCadastro(l.p, cfg))}</div>
-                    </div>
-                    <div className="text-[10px] text-tinta-fraca text-center pb-1 shrink-0">promoção<br /><strong className="text-tinta">−{pct(cfg.descontoPromocao, 0)}</strong> →</div>
-                    <div className="flex-1 min-w-0 text-right">
-                      <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Preço promocional</div>
-                      <div className={`tabular-nums font-bold font-titulo leading-tight ${l.forte ? 'text-2xl text-tinta' : 'text-lg text-tinta'}`}>{brl(l.p)}</div>
-                    </div>
-                  </div>
-                )}
-                {l.p != null && unidades > 1 && (
-                  <div className="text-[11px] text-tinta-fraca mt-1.5 pt-1.5 border-t border-rdb-100">
-                    Kit com {unidades} unidades: sai a <strong className="text-tinta">{brl(l.p / unidades)}</strong> por unidade no preço promocional
-                  </div>
-                )}
-              </div>
-            ))}
-            {precoTeste != null && (
-              <div className="rounded-xl border border-dashed border-atencao/60 bg-atencao/5 p-3">
-                <div className="text-[11px] font-semibold text-tinta mb-1.5">No preço que você está testando</div>
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Cadastrar o anúncio por</div>
-                    <div className="tabular-nums font-bold font-titulo text-lg text-tinta leading-tight">{brl(precoCadastro(precoTeste, cfg))}</div>
-                  </div>
-                  <div className="text-[10px] text-tinta-fraca text-center pb-1 shrink-0">promoção<br /><strong className="text-tinta">−{pct(cfg.descontoPromocao, 0)}</strong> →</div>
-                  <div className="flex-1 min-w-0 text-right">
-                    <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">Preço promocional</div>
-                    <div className="tabular-nums font-bold font-titulo text-lg text-tinta leading-tight">{brl(precoTeste)}</div>
-                  </div>
-                </div>
-              </div>
+          <div className="p-4 space-y-2.5">
+            {testando && (
+              <p className="text-[11px] text-atencao bg-atencao/5 border border-atencao/30 rounded-lg px-2.5 py-1.5">
+                Você está testando o preço de {brl(r.preco)}. Para ver o preço recomendado, apague o campo "Preço promocional a testar".
+              </p>
             )}
-          </div>
 
-          <div className="px-4 py-3 border-t border-rdb-100 flex items-baseline justify-between gap-3">
-            <div className="text-xs text-tinta-fraca">{precoTeste != null ? 'Margem sem Ads no preço testado' : 'Margem sem Ads no preço promocional da meta'} — sobram {brl(r.margem)} por unidade</div>
-            <div className={`text-2xl font-bold font-titulo tabular-nums ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</div>
-          </div>
+            <Passo n={1} titulo="Cadastre o anúncio por este preço" tom="destaque">
+              <div className="text-3xl font-bold font-titulo tabular-nums text-rdb-700 leading-tight">{brl(precoCadastro(r.preco, cfg))}</div>
+              <div className="text-[11px] text-tinta-fraca mt-0.5">é o preço cheio, antes da promoção</div>
+            </Passo>
 
-          <table className="w-full border-t border-rdb-100 table-fixed">
-            <colgroup><col /><col className="w-24" /><col className="w-16" /></colgroup>
-            <tbody>
-              <tr className="tr-row"><td className="td font-medium whitespace-normal">Preço promocional (o cliente paga)</td><td className="td-r font-semibold">{brl(r.preco)}</td><td className="td-r text-xs text-tinta-fraca">100%</td></tr>
-              {r.linhas.filter(l => l.rotulo !== 'Ads').map(l => (
-                <tr key={l.rotulo} className="tr-row">
-                  <td className="td text-tinta-fraca whitespace-normal">− {l.rotulo}</td>
-                  <td className="td-r">{brl(l.valor)}</td>
-                  <td className="td-r text-xs text-tinta-fraca">{pct(l.valor / r.preco)}</td>
-                </tr>
-              ))}
-              <tr><td className="td font-semibold whitespace-normal">Margem sem Ads</td><td className={`td-r font-bold ${COR_TXT[r.semaforo]}`}>{brl(r.margem)}</td><td className={`td-r text-xs font-semibold ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</td></tr>
-            </tbody>
-          </table>
+            <Passo n={2} titulo={`Crie a promoção de ${pct(cfg.descontoPromocao, 0)}`}>
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-xs text-tinta-fraca">o cliente paga</span>
+                <span className="text-2xl font-bold font-titulo tabular-nums text-tinta leading-tight">{brl(r.preco)}</span>
+              </div>
+              <div className="text-[11px] text-tinta-fraca mt-1">
+                Sobram <strong className={COR_TXT[r.semaforo]}>{brl(r.margem)} ({pct(r.margemPct)})</strong> por venda, sem contar Ads.
+                {unidades > 1 && <> No kit de {unidades}, sai a {brl(r.preco / unidades)} por unidade.</>}
+              </div>
+            </Passo>
 
-          {ads && (
-            <div className={`px-4 py-3 border-t border-rdb-100 ${ads.cabe ? 'bg-rdb-50/60' : 'bg-perigo/5'}`}>
-              {!ads.cabe ? (
-                <>
-                  <div className="text-sm font-bold text-perigo">Sem Ads</div>
-                  <p className="text-[11px] text-tinta-fraca mt-0.5">
-                    Sobram {pct(ads.sobra)} sem Ads, abaixo do mínimo de {pct(cfg.piso, 0)}. Venda no orgânico{canal === 'shopee' ? ' ou monte um kit (a taxa fixa e a embalagem são cobradas uma vez só)' : ''}.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="text-[11px] font-semibold text-tinta">
-                      {canal === 'ml' ? 'Pode ter Ads: colocar numa campanha com ROAS objetivo de' : 'Meta de Ads: colocar no anúncio a meta de ROAS'}
-                    </div>
-                    <div className="text-2xl font-bold font-titulo tabular-nums text-rdb-700 whitespace-nowrap">{canal === 'ml' ? `${dec(ads.metaConfigurar!)} ou mais` : dec(ads.metaConfigurar!)}</div>
+            {ads.cabe && ads.metaConfigurar != null ? (
+              <Passo n={3} titulo={canal === 'ml' ? 'Ads: pode entrar em campanha' : 'Ads: pode anunciar'} tom="verde">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">{canal === 'ml' ? 'ROAS objetivo da campanha' : 'Meta de ROAS para digitar'}</div>
+                    <div className="text-3xl font-bold font-titulo tabular-nums text-ok leading-tight">{dec(ads.metaConfigurar)}{canal === 'ml' && <span className="text-sm font-semibold"> ou mais</span>}</div>
                   </div>
-                  <p className="text-[11px] text-tinta-fraca mt-1">
-                    <strong className="text-tinta">Regra:</strong> sobram {pct(ads.sobra)} sem Ads − {pct(cfg.reservaAds, 0)} de lucro garantido = Ads até {pct(ads.adsMaximo)} do preço
-                    → ROAS real de {dec(ads.roasReal!)}
-                    {ads.fator !== 1 && <> → ÷ {dec(ads.fator, 2)} ({canal === 'shopee' ? 'a Shopee entrega' : 'o canal entrega'} ROAS ~{pct(1 - ads.fator, 0)} abaixo da meta)</>}
-                    {' '}= <strong className="text-tinta">{dec(ads.metaConfigurar!)}</strong>.
-                  </p>
-                  {canal === 'ml' ? (
-                    <p className="text-[11px] text-tinta-fraca mt-1">
-                      No ML o Ads é por campanha, com vários produtos dentro, e a verba é da campanha. Este anúncio aguenta gastar até <strong className="text-tinta">{brl(ads.adsPorVenda)}</strong> por venda: coloque-o só em campanha com ROAS objetivo igual ou maior que {dec(ads.metaConfigurar!)}.
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-tinta-fraca mt-1">
-                      <strong className="text-tinta">Verba diária:</strong>{' '}
-                      {vendasDia
-                        ? <>{brl(Math.max(VERBA_MINIMA, ads.adsPorVenda * vendasDia))} ({brl(ads.adsPorVenda)} por venda × {String(vendasDia).replace('.', ',')} venda(s) por dia{ads.adsPorVenda * vendasDia < VERBA_MINIMA ? `; a Shopee pede no mínimo ${brl(VERBA_MINIMA)}` : ''})</>
-                        : <>até {brl(ads.adsPorVenda)} por venda. Informe as vendas por dia acima para ver a verba.</>}
-                    </p>
+                  {canal !== 'ml' && (
+                    <div className="text-right">
+                      <div className="text-[10px] uppercase tracking-wide text-tinta-fraca">{vendasDia ? 'Verba diária' : 'Gasto de Ads'}</div>
+                      <div className="text-xl font-bold font-titulo tabular-nums text-tinta leading-tight">
+                        {vendasDia ? brl(Math.max(VERBA_MINIMA, ads.adsPorVenda * vendasDia)) : <>até {brl(ads.adsPorVenda)}</>}
+                      </div>
+                      <div className="text-[10px] text-tinta-fraca">{vendasDia ? `${brl(ads.adsPorVenda)} por venda × ${dec(vendasDia, vendasDia % 1 ? 1 : 0)} venda(s) por dia` : 'por venda'}</div>
+                    </div>
                   )}
-                </>
-              )}
-            </div>
-          )}
+                </div>
+                {canal === 'ml' && (
+                  <p className="text-[11px] text-tinta mt-1.5">
+                    Coloque este anúncio numa campanha com ROAS objetivo de {dec(ads.metaConfigurar)} ou mais. Ele aguenta gastar até <strong>{brl(ads.adsPorVenda)}</strong> por venda. No Mercado Livre a verba é da campanha, não do anúncio.
+                  </p>
+                )}
+                {canal !== 'ml' && vendasDia != null && ads.adsPorVenda * vendasDia < VERBA_MINIMA && (
+                  <p className="text-[11px] text-tinta-fraca mt-1">A conta daria {brl(ads.adsPorVenda * vendasDia)}, mas a verba mínima é {brl(VERBA_MINIMA)}.</p>
+                )}
+                {canal !== 'ml' && !vendasDia && (
+                  <p className="text-[11px] text-tinta-fraca mt-1">Preencha "Vendas por dia que você espera" para ver a verba diária.</p>
+                )}
+                <p className="text-[11px] text-tinta-fraca mt-2 pt-2 border-t border-ok/20 leading-relaxed">
+                  <strong className="text-tinta">Por quê:</strong> sobram {pct(ads.sobra)} sem Ads − {pct(cfg.reservaAds, 0)} de lucro garantido = Ads até {pct(ads.adsMaximo)} do preço → ROAS real de {dec(ads.roasReal ?? 0)}
+                  {Math.abs(ads.fator - 1) > 1e-9
+                    ? <> → ÷ {dec(ads.fator, 2)} ({canal === 'shopee' ? 'a Shopee' : canal === 'tiktok' ? 'o TikTok' : 'o Mercado Livre'} entrega ROAS ~{Math.round((1 - ads.fator) * 100)}% abaixo da meta) = <strong className="text-tinta">{dec(ads.metaConfigurar)}</strong></>
+                    : <> (aqui a meta é igual ao ROAS real)</>}.
+                </p>
+              </Passo>
+            ) : (
+              <Passo n={3} titulo="Ads: não anuncie este produto" tom="vermelho">
+                <div className="text-2xl font-bold font-titulo text-perigo leading-tight">Sem Ads</div>
+                <p className="text-xs text-tinta mt-1">
+                  Sobram {pct(ads.sobra)} sem Ads, abaixo do mínimo de {pct(cfg.piso, 0)}. Venda no orgânico{canal === 'shopee' ? ' ou monte um kit (a taxa fixa e a embalagem são cobradas uma vez só)' : ''}.
+                </p>
+              </Passo>
+            )}
 
-          <button onClick={() => setAbrir(a => !a)} className="w-full flex items-center justify-between px-4 py-2 text-xs text-tinta-fraca hover:bg-rdb-50 border-t border-rdb-100">
-            Como o preço ideal foi achado, por faixa de preço <ChevronDown size={13} className={abrir ? 'rotate-180 transition-transform' : 'transition-transform'} />
+            <div className="text-[11px] text-tinta-fraca px-1">
+              {testando && ideal.preco != null && <div>Preço recomendado (margem de {pct(cfg.meta, 0)}): cadastrar <strong className="text-tinta">{brl(precoCadastro(ideal.preco, cfg))}</strong> → promocional <strong className="text-tinta">{brl(ideal.preco)}</strong>.</div>}
+              {piso.preco != null
+                ? <div>Não venda abaixo de <strong className="text-tinta">{brl(piso.preco)}</strong> no promocional (cadastro de {brl(precoCadastro(piso.preco, cfg))}): é o mínimo de {pct(cfg.piso, 0)}.</div>
+                : <div className="text-perigo">Não existe preço que entregue o mínimo de {pct(cfg.piso, 0)} com essas taxas.</div>}
+            </div>
+          </div>
+
+          <button onClick={() => setAbrir(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-rdb-700 hover:bg-rdb-50 border-t border-rdb-100">
+            {abrir ? 'Esconder a conta' : 'Ver a conta: para onde vai cada real'} <ChevronDown size={13} className={abrir ? 'rotate-180 transition-transform' : 'transition-transform'} />
           </button>
           {abrir && (
-            <div className="overflow-auto border-t border-rdb-100">
-              <table className="w-full">
-                <thead className="tbl-head"><tr>
-                  <th className="th">Faixa de preço</th><th className="th-r">{canal === 'ml' ? 'Envio' : 'Taxa fixa'}</th>
-                  <th className="th-r">Preço p/ meta</th><th className="th-r">Válido</th><th className="th-r">Preço p/ piso</th><th className="th-r">Válido</th>
-                </tr></thead>
+            <>
+              <table className="w-full border-t border-rdb-100 table-fixed">
+                <colgroup><col /><col className="w-24" /><col className="w-16" /></colgroup>
                 <tbody>
-                  {ideal.faixas.map((f, i) => (
-                    <tr key={f.de} className="tr-row">
-                      <td className="td text-xs">{brl(f.de)} {f.ate != null ? `a ${brl(f.ate)}` : 'ou mais'}</td>
-                      <td className="td-r text-xs">{brl(f.custoFaixa)}</td>
-                      <td className="td-r text-xs text-tinta-fraca">{brl(f.preco)}</td>
-                      <td className={`td-r text-xs ${f.valido != null && f.valido === ideal.preco ? 'font-bold text-rdb-700' : ''}`}>{f.valido != null ? brl(f.valido) : '—'}</td>
-                      <td className="td-r text-xs text-tinta-fraca">{brl(piso.faixas[i].preco)}</td>
-                      <td className={`td-r text-xs ${piso.faixas[i].valido != null && piso.faixas[i].valido === piso.preco ? 'font-bold text-tinta' : ''}`}>{piso.faixas[i].valido != null ? brl(piso.faixas[i].valido) : '—'}</td>
+                  <tr className="tr-row"><td className="td font-medium whitespace-normal">Preço promocional (o cliente paga)</td><td className="td-r font-semibold">{brl(r.preco)}</td><td className="td-r text-xs text-tinta-fraca">100%</td></tr>
+                  {r.linhas.filter(l => l.rotulo !== 'Ads').map(l => (
+                    <tr key={l.rotulo} className="tr-row">
+                      <td className="td text-tinta-fraca whitespace-normal">− {l.rotulo}</td>
+                      <td className="td-r">{brl(l.valor)}</td>
+                      <td className="td-r text-xs text-tinta-fraca">{pct(l.valor / r.preco)}</td>
                     </tr>
                   ))}
+                  <tr><td className="td font-semibold whitespace-normal">Margem sem Ads</td><td className={`td-r font-bold ${COR_TXT[r.semaforo]}`}>{brl(r.margem)}</td><td className={`td-r text-xs font-semibold ${COR_TXT[r.semaforo]}`}>{pct(r.margemPct)}</td></tr>
                 </tbody>
               </table>
-              <p className="text-[11px] text-tinta-fraca px-4 py-2">
-                {canal === 'ml' ? 'O envio do Full Super' : canal === 'shopee' ? 'A taxa fixa da Shopee' : 'A comissão e a taxa fixa do TikTok'} muda conforme a faixa de preço. Vale o menor preço que cai dentro da própria faixa; quando a conta dá abaixo do início da faixa, vale o início.
-              </p>
-            </div>
+              <div className="overflow-auto border-t border-rdb-100">
+                <div className="px-4 pt-3 text-[11px] font-semibold text-tinta">Como o preço recomendado foi achado, por faixa de preço</div>
+                <table className="w-full">
+                  <thead className="tbl-head"><tr>
+                    <th className="th">Faixa de preço</th><th className="th-r">{canal === 'ml' ? 'Envio' : 'Taxa fixa'}</th>
+                    <th className="th-r">Preço p/ meta</th><th className="th-r">Válido</th><th className="th-r">Preço p/ mínimo</th><th className="th-r">Válido</th>
+                  </tr></thead>
+                  <tbody>
+                    {ideal.faixas.map((fx, i) => (
+                      <tr key={fx.de} className="tr-row">
+                        <td className="td text-xs">{brl(fx.de)} {fx.ate != null ? `a ${brl(fx.ate)}` : 'ou mais'}</td>
+                        <td className="td-r text-xs">{brl(fx.custoFaixa)}</td>
+                        <td className="td-r text-xs text-tinta-fraca">{brl(fx.preco)}</td>
+                        <td className={`td-r text-xs ${fx.valido != null && fx.valido === ideal.preco ? 'font-bold text-rdb-700' : ''}`}>{fx.valido != null ? brl(fx.valido) : '—'}</td>
+                        <td className="td-r text-xs text-tinta-fraca">{brl(piso.faixas[i].preco)}</td>
+                        <td className={`td-r text-xs ${piso.faixas[i].valido != null && piso.faixas[i].valido === piso.preco ? 'font-bold text-tinta' : ''}`}>{piso.faixas[i].valido != null ? brl(piso.faixas[i].valido) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-[11px] text-tinta-fraca px-4 py-2">
+                  {canal === 'ml' ? 'O envio do Full Super' : canal === 'shopee' ? 'A taxa fixa da Shopee' : 'A comissão e a taxa fixa do TikTok'} muda conforme a faixa de preço. Vale o menor preço que cai dentro da própria faixa; quando a conta dá abaixo do início da faixa, vale o início.
+                </p>
+              </div>
+            </>
           )}
         </>
       )}
@@ -292,8 +298,8 @@ function Conteudo() {
       <div className="flex items-start gap-3 rounded-xl border border-rdb-200 bg-rdb-50 px-4 py-3 text-sm text-tinta">
         <Megaphone size={16} className="text-rdb-700 mt-0.5 shrink-0" />
         <span>
-          <strong>Como usar:</strong> em cada canal, o valor da esquerda é o <strong>preço para cadastrar no anúncio</strong> (preço cheio). Depois você cria a promoção de {pct(cfg.descontoPromocao, 0)} e o anúncio fica no <strong>preço promocional</strong> da direita, que é o que o cliente paga.
-          As taxas e a margem são calculadas sobre o preço promocional, <strong>sem Ads</strong>. No fim de cada canal aparece se o produto pode ter Ads, qual meta de ROAS colocar e por quê.
+          <strong>Como usar:</strong> escolha o produto e siga os três passos de cada canal. <strong>1</strong> — cadastre o anúncio pelo preço cheio. <strong>2</strong> — crie a promoção de {pct(cfg.descontoPromocao, 0)}; o cliente paga o preço promocional.{' '}
+          <strong>3</strong> — veja se o produto pode ter Ads e qual meta de ROAS colocar. As taxas e a margem são calculadas sem Ads. No fim de cada canal aparece se o produto pode ter Ads, qual meta de ROAS colocar e por quê.
         </span>
       </div>
 
