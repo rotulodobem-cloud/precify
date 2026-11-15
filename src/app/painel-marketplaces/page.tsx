@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import Rentabilidade from '@/components/ui/Rentabilidade'
+import ConexaoShopee from '@/components/ui/ConexaoShopee'
 
 export default function PainelMarketplacesPage() {
   const [mes, setMes] = useState(new Date().toISOString().slice(0, 7))
@@ -18,6 +19,8 @@ export default function PainelMarketplacesPage() {
         </div>
       </div>
       <Rentabilidade mes={mes} escopo="marketplace" comProdutos />
+      {/* useSearchParams exige Suspense para a página poder ser pré-renderizada */}
+      <Suspense fallback={null}><ConexaoShopee /></Suspense>
     </div>
   )
 }
