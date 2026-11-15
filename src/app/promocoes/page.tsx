@@ -106,9 +106,15 @@ export default function PromocoesPage() {
   }
   const baixar = () => {
     const n = (v: number | null | undefined) => (v == null ? '' : v.toFixed(2).replace('.', ','))
+    // texto vindo do cadastro: entre aspas, com aspas internas dobradas, e sem deixar o Excel
+    // interpretar como fórmula valores que começam com = + - @ (ou tab / retorno de carro)
+    const texto = (s: string | null | undefined) => {
+      const v = String(s ?? '')
+      return '"' + (/^[=+\-@\t\r]/.test(v) ? "'" + v : v).replace(/"/g, '""') + '"'
+    }
     const cab = ['SKU', 'Produto', 'Categoria', 'Curva', 'Unidade', 'Preço atual', `Preço com ${desconto}%`, 'Desconto máximo %', 'Margem atual %', 'Margem na promoção %', 'Estoque', 'Dias de estoque']
     const rows = paraExportar.map(l => [
-      l.sku, `"${l.nome.replace(/"/g, '""')}"`, `"${l.categoria}"`, l.curva, l.fracionado ? 'kg' : 'un', n(l.preco), n(l.precoPromo),
+      texto(l.sku), texto(l.nome), texto(l.categoria), texto(l.curva), l.fracionado ? 'kg' : 'un', n(l.preco), n(l.precoPromo),
       n(l.descMax * 100), n(l.margemAtual != null ? l.margemAtual * 100 : null), n(l.margemPromo != null ? l.margemPromo * 100 : null),
       l.g ? n(l.g.saldo) : '', l.g?.cobertura != null ? String(Math.floor(l.g.cobertura)) : '',
     ].join(';'))
