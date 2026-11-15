@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Package, Calculator, Layers, Store, Tag,
+  LayoutDashboard, Package, Calculator, Megaphone, Layers, Store, Tag,
   ShoppingCart, Upload, Download, Search, ChevronRight,
   Zap, Truck, Settings, Leaf, Percent, KeyRound
 } from 'lucide-react'
@@ -14,6 +14,7 @@ const links = [
   { divider: true,           label: 'Loja e site' },
   { href: '/precificar',     label: 'Precificar',      icon: Calculator },
   { href: '/analise-precos', label: 'Análise de preços', icon: Percent },
+  { href: '/promocoes',      label: 'Promoções',       icon: Megaphone },
   { divider: true,           label: 'Marketplaces' },
   { href: '/painel-marketplaces', label: 'Painel', icon: Store },
   { href: '/precificar-marketplaces', label: 'Precificar', icon: Leaf },
