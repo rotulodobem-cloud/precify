@@ -221,3 +221,39 @@ export async function lerPrecosFarol(forcar = false): Promise<PrecoVendaFarol[]>
   cachePrecos = { em: Date.now(), dados }
   return dados
 }
+
+// ── Rentabilidade por canal (DRE de margem do Farol) ──
+export interface CanalRentabilidade {
+  canal: string; plataforma: string | null; pedidos: number
+  receita: number; descontos: number; receita_liquida: number
+  cmv: number; taxas_canal: number; taxa_origem: string | null; impostos: number
+  margem_contribuicao: number; publicidade: number; frete_liquido: number; outras_diretas: number
+  resultado_direto: number; cobertura_custo_pct: number | null
+}
+export interface ProdutoMarketplace {
+  canal: string; plataforma: string | null; sku: string; descricao: string
+  qtd: number; pedidos: number; receita: number; cmv: number | null
+  margem_bruta_pct: number | null; preco_medio: number | null; custo_medio: number | null; sem_custo: boolean
+}
+export interface Rentabilidade { inicio: string; fim: string; canais: CanalRentabilidade[]; produtos_marketplace: ProdutoMarketplace[] }
+const cacheRent = new Map<string, { em: number; dados: Rentabilidade }>()
+
+export async function lerRentabilidade(inicio: string, fim: string, forcar = false): Promise<Rentabilidade> {
+  const chave = `${inicio}|${fim}`
+  const c = cacheRent.get(chave)
+  if (!forcar && c && Date.now() - c.em < CACHE_MS) return c.dados
+  const { FAROL_URL, FAROL_ANON_KEY, FAROL_CHAVE_LEITURA } = process.env
+  if (!FAROL_URL || !FAROL_ANON_KEY || !FAROL_CHAVE_LEITURA) throw new ErroFarol('SEM_CONFIG')
+  let r: Response
+  try {
+    r = await fetch(`${FAROL_URL}/rest/v1/rpc/precify_rentabilidade`, {
+      method: 'POST', cache: 'no-store',
+      headers: { apikey: FAROL_ANON_KEY, Authorization: `Bearer ${FAROL_ANON_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_chave: FAROL_CHAVE_LEITURA, p_inicio: inicio, p_fim: fim }),
+    })
+  } catch { throw new ErroFarol('SEM_CONEXAO') }
+  if (!r.ok) throw new ErroFarol(`HTTP_${r.status}`)
+  const dados = (await r.json()) as Rentabilidade
+  cacheRent.set(chave, { em: Date.now(), dados })
+  return dados
+}

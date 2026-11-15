@@ -11,10 +11,12 @@ import type { Role } from '@/lib/auth'
 
 const links = [
   { href: '/',               label: 'Painel',         icon: LayoutDashboard },
-  { divider: true,           label: 'Precificação' },
-  { href: '/precificar',     label: 'Loja e site',     icon: Calculator },
+  { divider: true,           label: 'Loja e site' },
+  { href: '/precificar',     label: 'Precificar',      icon: Calculator },
   { href: '/analise-precos', label: 'Análise de preços', icon: Percent },
-  { href: '/precificacao-multicanal', label: 'Marketplaces', icon: Leaf },
+  { divider: true,           label: 'Marketplaces' },
+  { href: '/painel-marketplaces', label: 'Painel', icon: Store },
+  { href: '/precificacao-multicanal', label: 'Precificar', icon: Leaf },
   { href: '/frete',          label: 'Frete ML',        icon: Truck },
   { divider: true,           label: 'Cadastros' },
   { href: '/produtos',       label: 'Produtos',        icon: Package },

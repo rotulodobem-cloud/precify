@@ -80,7 +80,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
   const visiveis = useMemo(() => {
     const b = busca.trim().toLowerCase()
     return itens
-      .filter(i => visao === 'todos' || i.status === visao)
+      .filter(i => !!b || visao === 'todos' || i.status === visao)
       .filter(i => !fornFiltro || (fornEdit[i.sku] ?? i.fornecedorPadrao) === fornFiltro)
       .filter(i => !b || i.sku.toLowerCase().includes(b) || i.nome.toLowerCase().includes(b))
       // urgente/comprar: primeiro o que mais pesa no caixa e na venda; parado: mais dinheiro preso
@@ -92,6 +92,9 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
   const selecionados = itens.filter(i => marcados[i.sku] && qtdDe(i) > 0)
   const totalSel = selecionados.reduce((s, i) => s + qtdDe(i) * (precoDe(i) ?? 0), 0)
   const todosMarcados = visiveis.length > 0 && visiveis.every(i => marcados[i.sku])
+  // buscando, a tabela mostra tudo no formato de compra, mesmo com o cartão "parado" aberto
+  const formatoParado = visao === 'parado' && !busca.trim()
+  const ROTULO: Record<ItemSug['status'], string> = { urgente: 'urgente', comprar: 'comprar', ok: 'coberto', parado: 'parado' }
 
   const adicionar = () => {
     const semForn = selecionados.filter(i => !fornDe(i))
@@ -129,7 +132,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
       <div className="card p-3 flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-1 min-w-48 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
           <Search size={13} className="text-gray-400" />
-          <input className="flex-1 text-sm outline-none bg-transparent" placeholder="Buscar SKU ou produto…" value={busca} onChange={e => setBusca(e.target.value)} />
+          <input className="flex-1 text-sm outline-none bg-transparent" placeholder="Buscar em todos os produtos (SKU ou nome)…" value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
         <select className="inp-sm w-auto" value={fornFiltro} onChange={e => setFornFiltro(e.target.value)}>
           <option value="">Todos fornecedores</option>
@@ -160,7 +163,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
       <div className="card-tight overflow-auto">
         <table className="w-full">
           <thead className="tbl-head"><tr>
-            {visao !== 'parado' && (
+            {!formatoParado && (
               <th className="th w-8">
                 <input type="checkbox" checked={todosMarcados}
                   onChange={e => setMarcados(p => { const n = { ...p }; visiveis.forEach(i => { n[i.sku] = e.target.checked }); return n })} />
@@ -171,23 +174,23 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
             <th className="th-r">Vende/30d</th>
             <th className="th">13 semanas</th>
             <th className="th-r">Dura</th>
-            {visao === 'parado'
+            {formatoParado
               ? <><th className="th-r">Valor parado</th><th className="th">Última compra</th></>
               : <><th className="th">Fornecedor · último preço</th><th className="th-r">Comprar</th><th className="th-r">Custo</th></>}
           </tr></thead>
           <tbody className="divide-y divide-gray-50">
             {loading && <tr><td colSpan={99} className="py-12 text-center text-gray-400 text-sm"><span className="inline-flex items-center gap-2"><Spinner /> Calculando giro de estoque…</span></td></tr>}
-            {!loading && !visiveis.length && <tr><td colSpan={99} className="py-12 text-center text-gray-400 text-sm">{erro ? 'Sem dados.' : 'Nenhum produto nesta situação.'}</td></tr>}
+            {!loading && !visiveis.length && <tr><td colSpan={99} className="py-12 text-center text-gray-400 text-sm">{erro ? 'Sem dados.' : busca.trim() ? `Nenhum produto com venda ou estoque para "${busca.trim()}".` : 'Nenhum produto nesta situação.'}</td></tr>}
             {!loading && visiveis.map(i => {
               const f = fornDe(i), preco = precoDe(i), q = qtdDe(i)
               return (
                 <tr key={i.sku} className={`tr-row ${marcados[i.sku] ? 'bg-rdb-50/60' : ''}`}>
-                  {visao !== 'parado' && (
+                  {!formatoParado && (
                     <td className="td"><input type="checkbox" checked={!!marcados[i.sku]} onChange={e => setMarcados(p => ({ ...p, [i.sku]: e.target.checked }))} /></td>
                   )}
                   <td className="td">
                     <div className="text-sm font-medium text-gray-900 max-w-[260px] truncate" title={i.nome}>{i.nome}</div>
-                    <div className="text-[11px] text-gray-400 font-mono">{i.sku}{i.prazoDias > 2 && <span className="font-sans"> · entrega em {i.prazoDias} dias</span>}</div>
+                    <div className="text-[11px] text-gray-400 font-mono">{i.sku}{!!busca.trim() && <span className="font-sans"> · {ROTULO[i.status]}</span>}{i.prazoDias > 2 && <span className="font-sans"> · entrega em {i.prazoDias} dias</span>}</div>
                   </td>
                   <td className="td-r text-sm">
                     {i.semSaldoNoBling ? <span className="text-gray-300" title="Sem saldo cadastrado no Bling">—</span> : <>{qtd(i.saldo)} <span className="text-xs text-gray-400">{i.unidade}</span></>}
@@ -207,7 +210,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
                   <td className={`td-r text-sm font-bold ${i.status === 'urgente' ? 'text-red-600' : i.status === 'comprar' ? 'text-amber-600' : i.status === 'parado' ? 'text-blue-600' : 'text-gray-700'}`}>
                     {i.cobertura == null ? 'sem venda' : i.cobertura > 365 ? '+1 ano' : Math.floor(i.cobertura) === 1 ? '1 dia' : `${Math.floor(i.cobertura)} dias`}
                   </td>
-                  {visao === 'parado' ? (
+                  {formatoParado ? (
                     <>
                       <td className="td-r text-sm font-semibold">{brl(i.valorParado)}</td>
                       <td className="td text-xs text-gray-500">

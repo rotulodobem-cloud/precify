@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, TrendingDown, TrendingUp, AlertTriangle, PackageX, Calculator, ShoppingCart, ArrowRight, Star, Tag } from 'lucide-react'
 import PerguntaRapida from '@/components/ui/PerguntaRapida'
+import Rentabilidade from '@/components/ui/Rentabilidade'
 import { Spinner, Loading, Empty } from '@/components/ui'
 import Sparkline from '@/components/charts/Sparkline'
 import BarraStatus from '@/components/charts/BarraStatus'
@@ -251,6 +252,20 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Rentabilidade de loja e site ── */}
+      <div className="space-y-3">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-base font-semibold text-tinta font-titulo">Rentabilidade do mês — loja física e site</h2>
+            <p className="text-xs text-tinta-fraca mt-0.5">Vendas do Bling com o custo do Precify; use o seletor de mês no topo</p>
+          </div>
+          <Link href="/painel-marketplaces" className="text-xs font-medium text-rdb-700 hover:text-rdb-800 inline-flex items-center gap-1">
+            Ver painel de marketplaces <ArrowRight size={12} />
+          </Link>
+        </div>
+        <Rentabilidade mes={mes} escopo="proprio" />
       </div>
 
       {/* ── Produtos pra ajustar + fornecedores ── */}

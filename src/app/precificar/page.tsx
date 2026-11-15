@@ -56,7 +56,14 @@ function PrecificarContent() {
   }, [])
   useEffect(() => { carregar() }, [carregar])
 
-  const item = useMemo(() => itens.find(i => i.sku.toLowerCase() === sku.trim().toLowerCase()) ?? null, [itens, sku])
+  const [livreFracionado, setLivreFracionado] = useState(true)
+  const doCatalogo = useMemo(() => itens.find(i => i.sku.toLowerCase() === sku.trim().toLowerCase()) ?? null, [itens, sku])
+  // sem produto escolhido a calculadora continua aberta para qualquer custo e preço
+  const livre = !doCatalogo && !sku.trim()
+  const item: Item | null = doCatalogo ?? (livre ? {
+    sku: '', nome: 'Calculadora livre', categoria: '', fracionado: livreFracionado, custo: null, dataUltimaCompra: null,
+    fornecedor: null, preco: null, precoAtualizadoEm: null, precoMedio30d: null, receita90d: 0, receitaMkt90d: 0, curva: 'NOVO',
+  } : null)
   const sugestoes = useMemo(() => {
     const b = busca.trim().toLowerCase()
     if (b.length < 2) return []
@@ -160,7 +167,8 @@ function PrecificarContent() {
 
       {!item && !loading && (
         <div className="card p-10 text-center text-sm text-tinta-fraca">
-          {sku ? `Não encontrei o produto "${sku}" no cadastro do Precify.` : 'Escolha um produto para ver custo, preço atual, margem, gramaturas e promoções.'}
+          Não encontrei o produto "{sku}" no cadastro do Precify.{' '}
+          <button className="text-rdb-700 underline" onClick={() => { setSku(''); router.replace('/precificar', { scroll: false }) }}>Abrir a calculadora livre</button>
         </div>
       )}
 
@@ -171,7 +179,15 @@ function PrecificarContent() {
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <h2 className="text-lg font-semibold text-tinta font-titulo">{item.nome}</h2>
-                  <p className="text-xs text-tinta-fraca">SKU {item.sku} · {item.fracionado ? 'fracionado (granel)' : 'por unidade'} · curva {item.curva} · vendeu {brl(item.receita90d)} em 90 dias nas lojas e no site</p>
+                  {livre ? (
+                    <div className="flex items-center gap-3 text-xs text-tinta-fraca mt-1">
+                      <span>Digite custo e preço abaixo, ou busque um produto acima para trazer os dados dele.</span>
+                      <label className="flex items-center gap-1 whitespace-nowrap"><input type="radio" checked={livreFracionado} onChange={() => setLivreFracionado(true)} /> granel (por kg)</label>
+                      <label className="flex items-center gap-1 whitespace-nowrap"><input type="radio" checked={!livreFracionado} onChange={() => setLivreFracionado(false)} /> por unidade</label>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-tinta-fraca">SKU {item.sku} · {item.fracionado ? 'fracionado (granel)' : 'por unidade'} · curva {item.curva} · vendeu {brl(item.receita90d)} em 90 dias nas lojas e no site</p>
+                  )}
                 </div>
                 <Sinal s={a.semaforo} />
               </div>
@@ -179,13 +195,13 @@ function PrecificarContent() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="bg-rdb-50 rounded-xl p-3">
                   <div className="text-[11px] text-tinta-fraca">Preço atual no Bling</div>
-                  <div className="text-lg font-bold text-tinta tabular-nums">{item.preco ? `${brl(item.preco)}` : 'sem preço'}</div>
+                  <div className="text-lg font-bold text-tinta tabular-nums">{item.preco ? `${brl(item.preco)}` : livre ? '—' : 'sem preço'}</div>
                   <div className="text-[10px] text-tinta-fraca">por {un}{item.precoMedio30d != null && ` · vendido em média a ${brl(item.precoMedio30d)}`}</div>
                 </div>
                 <div className="bg-rdb-50 rounded-xl p-3">
                   <div className="text-[11px] text-tinta-fraca">Custo aplicado</div>
                   <div className="text-lg font-bold text-tinta tabular-nums">{brl(custo)}</div>
-                  <div className="text-[10px] text-tinta-fraca">{num(custoSim) ? 'custo de teste' : item.dataUltimaCompra ? `última compra ${new Date(item.dataUltimaCompra).toLocaleDateString('pt-BR')}` : 'sem compra registrada'}</div>
+                  <div className="text-[10px] text-tinta-fraca">{num(custoSim) ? 'custo de teste' : item.dataUltimaCompra ? `última compra ${new Date(item.dataUltimaCompra).toLocaleDateString('pt-BR')}` : livre ? 'digite abaixo' : 'sem compra registrada'}</div>
                 </div>
                 <div className="bg-rdb-50 rounded-xl p-3">
                   <div className="text-[11px] text-tinta-fraca">Preço ideal para {pct(config.meta, 0)} de margem</div>
@@ -203,11 +219,11 @@ function PrecificarContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 p-3 rounded-xl border border-dashed border-atencao/50 bg-atencao/5">
                 <div>
-                  <label className="lbl">Preço para simular (R$/{un}) — opcional</label>
+                  <label className="lbl">Preço para simular (R$/{un}){livre ? '' : ' — opcional'}</label>
                   <input className="inp" inputMode="decimal" value={precoSim} onChange={e => setPrecoSim(e.target.value)} placeholder={item.preco ? String(item.preco).replace('.', ',') : 'digite um preço'} />
                 </div>
                 <div>
-                  <label className="lbl">Custo para simular (R$/{un}) — opcional</label>
+                  <label className="lbl">Custo para simular (R$/{un}){livre ? '' : ' — opcional'}</label>
                   <input className="inp" inputMode="decimal" value={custoSim} onChange={e => setCustoSim(e.target.value)} placeholder={item.custo ? String(item.custo).replace('.', ',') : 'digite um custo'} />
                 </div>
                 <p className="md:col-span-2 text-[11px] text-tinta-fraca">A simulação não altera nada no Bling nem no cadastro: serve só para testar. Preço usado nas contas abaixo: <strong className="text-tinta">{brl(precoUsado)}</strong> ({base.toLowerCase()}).</p>
