@@ -36,10 +36,25 @@ interface Compra {
   numeroNF: string | null; numeroPedido: string | null
 }
 
+type LinhaVariacao = { sku: string; produto: string; custoAnt: number | null; custoAtual: number; variacaoPct: number | null; status: string; nCompras: number }
+
+const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+/** Sem busca: as 20 maiores variações. Com busca: todos os produtos comprados, sem ligar para acento. */
+function filtrarVariacoes(d: DashCompras | null, busca: string): LinhaVariacao[] {
+  const termos = semAcento(busca).split(/\s+/).filter(Boolean)
+  if (!termos.length) return d?.ranking20 ?? []
+  return (d?.variacoes ?? d?.ranking20 ?? []).filter(r => {
+    const alvo = semAcento(`${r.sku} ${r.produto}`)
+    return termos.every(t => alvo.includes(t))
+  })
+}
+
 interface DashCompras {
   totalGasto: number; totalCompras: number; fornecedoresAtivos: number; mediaMargemComPreco: number
   porFornecedor: { fornecedor: string; total: number; qtdCompras: number; qtdItens: number }[]
-  ranking20: { sku: string; produto: string; custoAnt: number | null; custoAtual: number; variacaoPct: number | null; status: string; nCompras: number }[]
+  ranking20: LinhaVariacao[]
+  variacoes?: LinhaVariacao[]
   volumeMensal: { sku: string; produto: string; mediaMensal: number; totalMeses: number; meses: Record<string, number> }[]
   melhorPreco: { sku: string; produto: string; fornecedores: { nome: string; precoMin: number }[]; melhor: string; economia: number }[]
   prejudizo: { sku: string; produto: string; custoUnit: number; precoVenda: number; margem: number; dataCompra: string }[]
@@ -773,6 +788,7 @@ function ComprasContent() {
         <div className="card-tight overflow-auto">
           <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between gap-3 flex-wrap">
             <span className="section-title">Variação de preço de compra (vs. anterior)</span>
+            <span className="text-xs text-gray-500">{buscaRanking.trim() ? 'Buscando em todos os produtos comprados' : 'As 20 maiores variações. Busque para ver qualquer produto.'}</span>
             <input type="text" placeholder="Buscar por nome ou SKU..." value={buscaRanking}
               onChange={e => setBuscaRanking(e.target.value)}
               className="inp-sm w-60" />
@@ -785,8 +801,10 @@ function ComprasContent() {
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
               {loading && <Loading />}
-              {!loading && !dash?.ranking20.length && <Empty msg="Nenhuma variação registrada" />}
-              {(dash?.ranking20 ?? []).filter(r => !buscaRanking || r.sku.toLowerCase().includes(buscaRanking.toLowerCase()) || r.produto.toLowerCase().includes(buscaRanking.toLowerCase())).map((r, i) => (
+              {!loading && !filtrarVariacoes(dash, buscaRanking).length && (
+                <Empty msg={buscaRanking.trim() ? `Nenhuma compra encontrada para "${buscaRanking.trim()}"` : 'Nenhuma variação registrada'} />
+              )}
+              {filtrarVariacoes(dash, buscaRanking).map((r, i) => (
                 <tr key={r.sku + i} className={`tr-row ${r.status === 'AUMENTOU > 5%' ? 'bg-red-50/40' : r.status === 'DIMINUIU > 5%' ? 'bg-emerald-50/40' : ''}`}>
                   <td className="td text-xs text-gray-400">{i + 1}</td>
                   <td className="td font-mono text-xs font-bold text-rdb-700">{r.sku}</td>

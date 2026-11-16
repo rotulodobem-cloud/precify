@@ -57,9 +57,25 @@ export async function GET() {
     }
   }
 
-  const ranking20 = Object.values(skuVars)
+  // Produtos com uma compra só (sem anterior para comparar) também entram,
+  // para que a busca da tela encontre qualquer produto comprado.
+  for (const c of compras) {
+    if (skuVars[c.skuPrincipal]) continue
+    skuVars[c.skuPrincipal] = {
+      sku: c.skuPrincipal,
+      produto: c.nomeProduto,
+      custoAnt: null,
+      custoAtual: c.custoUnitario,
+      variacaoPct: null,
+      status: 'PRIMEIRA COMPRA',
+      nCompras: skuContagem[c.skuPrincipal] ?? 1,
+    }
+  }
+
+  // Lista completa (a tela busca nela); o ranking mostra as 20 maiores sem busca.
+  const variacoes = Object.values(skuVars)
     .sort((a, b) => Math.abs(b.variacaoPct ?? 0) - Math.abs(a.variacaoPct ?? 0))
-    .slice(0, 20)
+  const ranking20 = variacoes.filter(v => v.variacaoPct != null).slice(0, 20)
 
   // ── Volume mensal ────────────────────────────────────────────
   const skuMeses: Record<string, { produto: string; meses: Record<string, number> }> = {}
@@ -138,6 +154,7 @@ export async function GET() {
     mediaMargemComPreco,
     porFornecedor,
     ranking20,
+    variacoes,
     volumeMensal,
     melhorPreco,
     prejudizo,
