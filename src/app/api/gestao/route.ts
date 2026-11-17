@@ -61,6 +61,17 @@ function montarAnuncios(c: {
   return anuncios
 }
 
+/** Kit no formato de um produto da API. O custoTotal do kit já inclui a embalagem dele. */
+function kitComoProduto(kit: { skuKit: string; nome: string; categoria: string; custoTotal: number | null; status: string }) {
+  const custo = kit.custoTotal == null ? null : Math.round(kit.custoTotal * 100) / 100
+  return {
+    skuPrincipal: kit.skuKit, nome: kit.nome, categoria: kit.categoria,
+    custoAtualizado: custo, custoUnitario: custo, custoPorKg: null,
+    unidadeCompra: 'unidade', fornecedorPrincipal: null, dataUltimaCompra: null,
+    ehKit: true, status: kit.status, variacoes: [],
+  }
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: CORS_HEADERS })
 }
@@ -120,7 +131,13 @@ export async function GET(req: NextRequest) {
         }),
       }))
 
-      return NextResponse.json({ ok: true, data: produtosResposta }, { headers: CORS_HEADERS })
+      // Kits da tela /kits que não existem também como produto: entram no mesmo formato de um produto,
+      // para quem consome a API (ex.: Farol Ads) achar o custo do kit pelo SKU dele.
+      const kits = await db.kit.findMany({ where: { status: 'ativo' }, orderBy: { nome: 'asc' } })
+      const skusDeProduto = new Set(produtos.map(produto => produto.skuPrincipal.toLowerCase()))
+      const kitsResposta = kits.filter(kit => !skusDeProduto.has(kit.skuKit.toLowerCase())).map(kitComoProduto)
+
+      return NextResponse.json({ ok: true, data: [...produtosResposta, ...kitsResposta] }, { headers: CORS_HEADERS })
     }
 
     // ── 2. PRODUTO ESPECÍFICO POR SKU ─────────────────────────────────────
@@ -137,6 +154,11 @@ export async function GET(req: NextRequest) {
       })
 
       if (!produto) {
+        // não é produto: pode ser um kit da tela /kits
+        const kit = await db.kit.findFirst({
+          where: { OR: [{ skuKit: { contains: sku, mode: 'insensitive' } }, { nome: { contains: sku, mode: 'insensitive' } }] },
+        })
+        if (kit) return NextResponse.json({ ok: true, data: kitComoProduto(kit) }, { headers: CORS_HEADERS })
         return NextResponse.json({ ok: false, error: 'Produto não encontrado' }, { status: 404, headers: CORS_HEADERS })
       }
 
