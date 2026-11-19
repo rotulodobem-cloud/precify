@@ -1,5 +1,5 @@
 'use client'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Search, Settings2, X, ChevronDown, Megaphone } from 'lucide-react'
@@ -263,6 +263,15 @@ function Conteudo() {
     })))
     setEditando(true)
   }
+  // vindo de Configurações (?parametros=1): abre os parâmetros assim que carregar
+  const abriuParametros = useRef(false)
+  useEffect(() => {
+    if (sp.get('parametros') === '1' && !loading && !abriuParametros.current) {
+      abriuParametros.current = true
+      abrirConfig()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
   const salvarConfig = async () => {
     setSalvando(true); setErro('')
     let novo = cfg
