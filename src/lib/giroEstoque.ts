@@ -58,13 +58,13 @@ export interface ItemSugestao {
   custoRef: number | null; valorSugerido: number; valorParado: number
 }
 export interface Sugestoes {
-  fotoEstoque: string | null; geradoEm: string; coberturaDias: number; semCadastro: number
+  fotoEstoque: string | null; geradoEm: string; coberturaDias: number; reforco: number; semCadastro: number
   /** kits vendidos que não têm composição cadastrada no Precify: a venda deles não entra nos componentes */
   kitsSemComposicao: number
   itens: ItemSugestao[]
 }
 
-export async function montarSugestoes(coberturaDias = 30, forcar = false): Promise<Sugestoes> {
+export async function montarSugestoes(coberturaDias = 30, forcar = false, reforco = 0): Promise<Sugestoes> {
   const farol = await lerFarol(forcar)
 
   const umAno = new Date(); umAno.setDate(umAno.getDate() - 365)
@@ -135,7 +135,7 @@ export async function montarSugestoes(coberturaDias = 30, forcar = false): Promi
     const melhorPreco = recentes.length > 1 ? recentes.reduce((a, b) => (b.preco < a.preco ? b : a)).nome : null
 
     const prazoDias = prazoEntrega(fornecedorPadrao, p.nome, p.categoria)
-    const g = calcularGiro({ semanas, saldo: f.saldo, diasFoto: f.dias_foto, diasZerado: f.dias_zerado, prazoDias, coberturaDias })
+    const g = calcularGiro({ semanas, saldo: f.saldo, diasFoto: f.dias_foto, diasZerado: f.dias_zerado, prazoDias, coberturaDias, reforco })
     if (g.status === 'sem_venda') return []
 
     const custoRef = fornecedores[0]?.preco ?? p.custoAtualizado ?? (emKg ? p.custoPorKg : p.custoUnitario) ?? null
@@ -158,6 +158,7 @@ export async function montarSugestoes(coberturaDias = 30, forcar = false): Promi
     fotoEstoque: farol.foto_estoque,
     geradoEm: farol.gerado_em,
     coberturaDias,
+    reforco,
     semCadastro: farol.itens.filter(i => i.semanas.length > 0 && !skusPrecify.has(i.sku) && !/^KIT/i.test(i.sku)).length,
     kitsSemComposicao,
     itens,

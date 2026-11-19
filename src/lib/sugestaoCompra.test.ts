@@ -79,3 +79,12 @@ test('prazoEntrega: 2 dias no geral, 4 na Gomah, mais nas linhas lentas', () => 
   assert.equal(prazoEntrega('VALLE', 'Biscoito Amanteigado Goiabada'), 7)
   assert.equal(prazoEntrega(null, 'Lavanda', 'Óleos Essenciais'), 7)
 })
+
+test('reforço de temporada aumenta só a compra, proporcional à venda prevista', () => {
+  const base = { semanas: [2, 0, 1, 0, 4, 0, 3, 0, 2, 0, 0, 1, 3], saldo: 2, diasFoto: 79, diasZerado: 0, prazoDias: 2, coberturaDias: 45 }
+  const sem = calcularGiro(base)
+  const com = calcularGiro({ ...base, reforco: 0.5 })
+  assert.equal(com.vendaDia, sem.vendaDia)
+  assert.ok(Math.abs((com.sugestao + 2) - (sem.sugestao + 2) * 1.5) < 1e-9)
+  assert.equal(calcularGiro({ ...base, reforco: -1 }).sugestao, sem.sugestao)
+})

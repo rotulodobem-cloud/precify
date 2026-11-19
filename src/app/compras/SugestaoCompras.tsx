@@ -44,6 +44,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
   const [loading, setLoading]   = useState(true)
   const [erro, setErro]         = useState('')
   const [cobertura, setCobertura] = useState('30')
+  const [reforco, setReforco]   = useState('0')
   const [visao, setVisao]       = useState<Visao>('urgente')
   const [busca, setBusca]       = useState('')
   const [fornFiltro, setFornFiltro] = useState('')
@@ -54,14 +55,14 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
   const carregar = useCallback(async (atualizar = false) => {
     setLoading(true); setErro('')
     try {
-      const r = await fetch(`/api/compras/sugestao?cobertura=${cobertura}${atualizar ? '&atualizar=1' : ''}`)
+      const r = await fetch(`/api/compras/sugestao?cobertura=${cobertura}&reforco=${reforco}${atualizar ? '&atualizar=1' : ''}`)
       const d = await r.json().catch(() => ({}))
       if (!r.ok) { setErro(d.error ?? `Erro ao carregar (HTTP ${r.status})`); setDados(null); return }
       setDados(d)
     } catch {
       setErro('Falha de conexão ao carregar as sugestões.')
     } finally { setLoading(false) }
-  }, [cobertura])
+  }, [cobertura, reforco])
   useEffect(() => { carregar() }, [carregar])
 
   const itens = dados?.itens ?? []
@@ -144,6 +145,13 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
             {['15', '21', '30', '45', '60'].map(d => <option key={d} value={d}>{d} dias</option>)}
           </select>
         </label>
+        <label className={`text-xs flex items-center gap-1.5 ${reforco !== '0' ? 'text-amber-800 font-semibold' : 'text-gray-500'}`} title="Para datas fortes (Natal, Ano Novo, Black Friday): aumenta a venda prevista só para calcular a compra">
+          Reforço de temporada
+          <select className={`inp-sm w-auto ${reforco !== '0' ? 'border-amber-400 bg-amber-50' : ''}`} value={reforco} onChange={e => setReforco(e.target.value)}>
+            <option value="0">Nenhum</option>
+            {['20', '30', '50', '100'].map(p => <option key={p} value={p}>+{p}%</option>)}
+          </select>
+        </label>
         <button onClick={() => setVisao('todos')} className={`text-xs px-2 py-1 rounded-lg ${visao === 'todos' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Ver todos</button>
         <button onClick={() => carregar(true)} className="btn-ghost text-xs" disabled={loading}>
           {loading ? <Spinner size={13} /> : <RefreshCw size={13} />} Atualizar
@@ -155,6 +163,7 @@ export default function SugestaoCompras({ onAdicionar }: { onAdicionar: (itens: 
         <p className="text-xs text-gray-500">
           Estoque do Bling fotografado em {dados.fotoEstoque ? new Date(dados.fotoEstoque + 'T12:00:00').toLocaleDateString('pt-BR') : '—'} · vendas das últimas 13 semanas em todos os canais
           {' '}· kits contam na venda dos componentes
+          {reforco !== '0' && <> · <span className="text-amber-800 font-semibold">sugestões com reforço de temporada de +{reforco}% sobre a venda prevista</span></>}
           {dados.kitsSemComposicao > 0 && <> · <span className="text-amber-700">{dados.kitsSemComposicao} kits vendidos estão sem composição cadastrada em Kits</span></>}
           {dados.semCadastro > 0 && <> · <span className="text-amber-700">{dados.semCadastro} produtos vendidos não têm cadastro no Precify e ficaram de fora</span></>}
         </p>

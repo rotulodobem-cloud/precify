@@ -28,6 +28,8 @@ export interface EntradaGiro {
   diasZerado: number
   prazoDias: number
   coberturaDias: number
+  /** reforço de temporada sobre a venda prevista para a compra (0.3 = +30%); padrão 0 */
+  reforco?: number
 }
 
 export interface ResultadoGiro {
@@ -77,7 +79,10 @@ export function calcularGiro(e: EntradaGiro): ResultadoGiro {
   const estoqueSeguranca = vendaDia > 0 ? Z * Math.sqrt(variancia) * Math.sqrt(e.prazoDias / 7) : 0
 
   const coberturaAtual = vendaDia > 0 ? saldo / vendaDia : null
-  const alvo = vendaDia * (e.prazoDias + e.coberturaDias) + estoqueSeguranca
+  // Reforço de temporada (Natal, Black Friday...): só aumenta o quanto comprar.
+  // O histórico de 13 semanas não enxerga datas que ainda não aconteceram.
+  const reforco = Math.min(3, Math.max(0, e.reforco ?? 0))
+  const alvo = vendaDia * (1 + reforco) * (e.prazoDias + e.coberturaDias) + estoqueSeguranca * (1 + reforco)
   const sugestao = vendaDia > 0 ? Math.max(0, alvo - saldo) : 0
 
   let status: StatusGiro
