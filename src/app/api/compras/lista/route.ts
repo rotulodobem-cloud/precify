@@ -81,7 +81,8 @@ export async function GET(req: NextRequest) {
     const desde = new Date(); desde.setMonth(desde.getMonth() - meses)
     const compras = await db.compra.findMany({ where: { dataCompra: { gte: desde } } })
 
-    const itens = curvaABC(compras)
+    // "ab000927" e "AB000927" são o mesmo produto: junta antes de classificar
+    const itens = curvaABC(compras.map(c => ({ ...c, skuPrincipal: c.skuPrincipal.trim().toUpperCase() })))
     const totalGeral = itens.reduce((s, i) => s + i.totalGasto, 0)
     const resultado = itens.map(i => ({
       sku: i.sku, produto: i.produto, curva: i.curva,

@@ -937,18 +937,17 @@ function ComprasContent() {
                   </div>
                 ))}
               </div>
-              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="th w-16">Curva</th>
+                      <th className="th w-14">Curva</th>
                       <th className="th">Produto</th>
-                      <th className="th text-right">Gasto médio/mês</th>
-                      <th className="th text-right">% do total</th>
-                      <th className="th text-right">Qtd média/mês</th>
-                      <th className="th w-32">Compras por mês</th>
-                      <th className="th">Fornecedor principal</th>
-                      <th className="th">Outros</th>
+                      <th className="th text-right whitespace-normal leading-tight">Gasto<br />médio/mês</th>
+                      <th className="th text-right whitespace-normal leading-tight">% do<br />total</th>
+                      <th className="th text-right whitespace-normal leading-tight">Qtd<br />média/mês</th>
+                      <th className="th w-24 whitespace-normal leading-tight">Compras<br />por mês</th>
+                      <th className="th">Fornecedores</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -985,15 +984,13 @@ function ComprasContent() {
                             </>
                           )
                         })()}
-                        <td className="td">
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.fornecedorPrincipal || '—'}</span>
-                        </td>
-                        <td className="td">
-                          <div className="flex flex-wrap gap-1">
-                            {item.outrosFornecedores.map(f => (
-                              <span key={f} className="text-xs bg-gray-50 text-gray-500 border border-gray-100 px-1.5 py-0.5 rounded">{f}</span>
-                            ))}
-                          </div>
+                        <td className="td max-w-[14rem]">
+                          <div className="text-xs font-medium text-gray-700 truncate" title={item.fornecedorPrincipal || ''}>{item.fornecedorPrincipal || '—'}</div>
+                          {item.outrosFornecedores.length > 0 && (
+                            <div className="text-[11px] text-gray-400 truncate" title={item.outrosFornecedores.join(', ')}>
+                              também: {item.outrosFornecedores.join(', ')}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
