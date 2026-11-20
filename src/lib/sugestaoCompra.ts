@@ -71,8 +71,10 @@ export function calcularGiro(e: EntradaGiro): ResultadoGiro {
   const diasComEstoque = e.diasFoto - e.diasZerado
   if (e.diasFoto >= 14 && e.diasZerado > 0 && diasComEstoque > 0) fator = Math.min(2, e.diasFoto / diasComEstoque)
 
-  // peso maior no mês recente, sem ignorar o trimestre
-  const vendaSemana = (0.6 * m4 + 0.4 * m13) * fator
+  // Venda subindo: o mês recente pesa mais. Venda caindo: fica a média do
+  // trimestre. Queda de um mês costuma ser passageira (produto fora da
+  // prateleira, mês fraco) e cortar a compra por ela deixa faltar produto.
+  const vendaSemana = Math.max(m13, 0.6 * m4 + 0.4 * m13) * fator
   const vendaDia = vendaSemana / 7
 
   const variancia = media(semanas.map(x => (x - m13) ** 2))

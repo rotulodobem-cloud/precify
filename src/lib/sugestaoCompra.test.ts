@@ -44,6 +44,15 @@ test('mês recente pesa mais: venda subindo aumenta a previsão e marca tendênc
   assert.ok(r.estoqueSeguranca > 0)
 })
 
+test('queda no último mês não derruba a previsão abaixo da média do trimestre', () => {
+  // óleo de melaleuca: vendia bem até outubro e quase parou em novembro
+  const semanas = [0, 0, 1, 1, 1, 4, 5, 3, 2, 0, 2, 0, 4]
+  const r = calcularGiro({ ...base, semanas, saldo: 3, coberturaDias: 60 })
+  assert.ok(Math.abs(r.vendaDia - 23 / 13 / 7) < 1e-9)
+  assert.ok(r.tendencia! < 0)
+  assert.equal(arredondarCompra(r.sugestao, 'un'), 14)
+})
+
 test('dias zerados corrigem a venda para cima, limitado ao dobro', () => {
   const semRuptura = calcularGiro({ ...base, semanas: estavel(7), saldo: 0 })
   const comRuptura = calcularGiro({ ...base, semanas: estavel(7), saldo: 0, diasFoto: 70, diasZerado: 35 })

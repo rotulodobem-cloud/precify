@@ -105,6 +105,12 @@ interface PedidoItemLocal {
   codigoFornecedor?: string; quantidade: number; unidade: string
   precoUnitario?: number; fornecedor: string
 }
+/** Giro do produto buscado em Montar pedido (mesma conta de "O que comprar") */
+interface GiroPedido {
+  unidade: string; saldo: number; vendaDia: number; venda30d: number
+  sugestao: number; tendencia: number | null; prazoDias: number
+}
+
 interface SugestaoForn {
   ultimas2Compras: { fornecedor: string; custoUnitario: number; quantidade: number; dataCompra: string }[]
   fornecedorSugerido: string | null; aliases: AliasItem[]
@@ -159,6 +165,8 @@ function ComprasContent() {
   const [fornSel, setFornSel]         = useState('')
   const [qtdInput, setQtdInput]       = useState('')
   const [unidInput, setUnidInput]     = useState('kg')
+  const [diasPedido, setDiasPedido]   = useState('30')
+  const [giroPedido, setGiroPedido]   = useState<GiroPedido | null | 'carregando'>(null)
   const [mesesCurva, setMesesCurva]   = useState('3')
   const [filtroCurva, setFiltroCurva] = useState<'todos'|'A'|'B'|'C'>('todos')
   const [aliasForm, setAliasForm]     = useState({ skuPrincipal:'', fornecedor:'', nomeNoFornecedor:'', codigoFornecedor:'', embalagem:'', ultimoPreco:'' })
@@ -443,6 +451,18 @@ function ComprasContent() {
   const [buscaOpcoes, setBuscaOpcoes] = useState<{ sku: string; nome: string }[]>([])
   const [buscaMsg, setBuscaMsg]       = useState('')
 
+  // Quantidade sugerida pelo giro de vendas, para os dias escolhidos
+  const carregarGiroPedido = async (sku: string, dias: string) => {
+    setGiroPedido('carregando')
+    try {
+      const r = await fetch(`/api/compras/sugestao?cobertura=${dias}&sku=${encodeURIComponent(sku)}`)
+      const d = r.ok ? await r.json() : null
+      const g: GiroPedido | null = d?.item ?? null
+      setGiroPedido(g)
+      if (g) { setQtdInput(g.sugestao > 0 ? String(g.sugestao) : ''); setUnidInput(g.unidade === 'kg' ? 'kg' : 'un') }
+    } catch { setGiroPedido(null) }
+  }
+
   const escolherProduto = async (prod: { sku: string; nome: string }) => {
     setBuscando(true); setBuscaOpcoes([]); setBuscaMsg('')
     try {
@@ -452,7 +472,8 @@ function ComprasContent() {
       const sData = await s.json()
       setSugestao(sData)
       setFornSel(sData.fornecedorSugerido || '')
-      setQtdInput(String(sData.sugestaoQtd || ''))
+      setQtdInput('')
+      await carregarGiroPedido(prod.sku, diasPedido)
     } catch {
       setBuscaRes(null); setBuscaMsg('Não foi possível carregar os dados desse produto. Tente de novo.')
     } finally { setBuscando(false) }
@@ -491,7 +512,7 @@ function ComprasContent() {
     const idx = pedido.findIndex(p => p.skuPrincipal === item.skuPrincipal && p.fornecedor === item.fornecedor)
     if (idx >= 0) { const n = [...pedido]; n[idx] = item; setPedido(n) }
     else setPedido(p => [...p, item])
-    setBuscaPedido(''); setBuscaRes(null); setSugestao(null); setFornSel(''); setQtdInput('')
+    setBuscaPedido(''); setBuscaRes(null); setSugestao(null); setGiroPedido(null); setFornSel(''); setQtdInput('')
   }
 
   const textoPedido = (forn: string, itens: PedidoItemLocal[]) => {
@@ -1044,9 +1065,24 @@ function ComprasContent() {
                         {brl(c.custoUnitario)}/kg — {dt(c.dataCompra)}
                       </div>
                     ))}
-                    {sugestao.qtd30dias > 0 && (
-                      <div className="text-xs text-gray-500 mt-2">Últimos 30 dias: <strong>{sugestao.qtd30dias} kg</strong></div>
-                    )}
+                    <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-100 p-2.5 text-xs text-gray-700 space-y-1">
+                      <label className="flex items-center gap-1.5 font-medium text-emerald-900">
+                        Comprar para
+                        <select className="inp-sm w-auto" value={diasPedido}
+                          onChange={e => { setDiasPedido(e.target.value); carregarGiroPedido(buscaRes.sku, e.target.value) }}>
+                          {['15', '21', '30', '45', '60', '90'].map(d => <option key={d} value={d}>{d} dias</option>)}
+                        </select>
+                      </label>
+                      {giroPedido === 'carregando' ? <div className="text-gray-400">Calculando pela venda…</div>
+                        : giroPedido ? (<>
+                          <div>Vende cerca de <strong>{(giroPedido.vendaDia * 7).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} {giroPedido.unidade} por semana</strong> · estoque hoje <strong>{giroPedido.saldo.toLocaleString('pt-BR')} {giroPedido.unidade}</strong></div>
+                          <div className="text-sm text-emerald-900">Sugestão para {diasPedido} dias: <strong>{giroPedido.sugestao.toLocaleString('pt-BR')} {giroPedido.unidade}</strong></div>
+                          {giroPedido.tendencia != null && giroPedido.tendencia < -0.3 && (
+                            <div className="text-amber-700">A venda caiu no último mês; a sugestão usa a média dos 3 meses.</div>
+                          )}
+                        </>)
+                        : <div className="text-gray-500">Sem venda nos últimos 3 meses: digite a quantidade.</div>}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <div>
