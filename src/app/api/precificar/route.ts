@@ -29,11 +29,15 @@ export async function GET(req: NextRequest) {
       select: { skuPrincipal: true, nome: true, categoria: true, unidadeCompra: true, custoAtualizado: true, custoPorKg: true, custoUnitario: true, dataUltimaCompra: true, fornecedorPrincipal: true },
       orderBy: { nome: 'asc' },
     }),
-    db.kit.findMany({ select: { skuKit: true } }),
+    db.kit.findMany({ select: { skuKit: true, nome: true, categoria: true, status: true, custoTotal: true, updatedAt: true, componentes: { select: { nomeProduto: true, quantidadeGramas: true, quantidadeUn: true } } } }),
   ])
   const ehKit = new Set(kits.map(k => k.skuKit))
   const precoDe = new Map(precos.map(p => [p.sku, p]))
-  const curva = curvaAbc(produtos.map(p => ({ sku: p.skuPrincipal, receita: precoDe.get(p.skuPrincipal)?.receita_propria_90d ?? 0 })))
+  const kitsAtivos = kits.filter(k => k.status === 'ativo')
+  const curva = curvaAbc([
+    ...produtos.map(p => ({ sku: p.skuPrincipal, receita: precoDe.get(p.skuPrincipal)?.receita_propria_90d ?? 0 })),
+    ...kitsAtivos.map(k => ({ sku: k.skuKit, receita: precoDe.get(k.skuKit)?.receita_propria_90d ?? 0 })),
+  ])
 
   const itens = produtos.filter(p => !ehKit.has(p.skuPrincipal) && !/^KIT/i.test(p.skuPrincipal)).map(p => {
     // granel tem SKU só numérico e é vendido por gramatura; os demais são por unidade
@@ -55,5 +59,23 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  return NextResponse.json({ config, avisoFarol, itens })
+  // Kits: custo é a soma da composição cadastrada em Kits; preço vem do Bling
+  const itensKit = kitsAtivos.map(k => {
+    const f = precoDe.get(k.skuKit)
+    const preco = f?.preco && f.preco > 0 ? Number(f.preco) : null
+    const custo = k.custoTotal && k.custoTotal > 0 ? k.custoTotal : null
+    const composicao = k.componentes.map(c => `${c.nomeProduto}${c.quantidadeGramas ? ` ${c.quantidadeGramas} g` : c.quantidadeUn ? ` ${c.quantidadeUn} un` : ''}`).join(' + ')
+    return {
+      sku: k.skuKit, nome: k.nome, categoria: k.categoria || 'Kits', fracionado: false,
+      custo, dataUltimaCompra: null, fornecedor: null, composicao,
+      preco, precoAtualizadoEm: f?.preco_atualizado_em ?? null,
+      precoMedio30d: f && f.un_proprio_30d > 0 ? Math.round((f.receita_propria_30d / f.un_proprio_30d) * 100) / 100 : null,
+      receita90d: f?.receita_propria_90d ?? 0,
+      receitaMkt90d: f?.receita_mkt_90d ?? 0,
+      curva: curva.get(k.skuKit) ?? 'NOVO',
+      ...analisar({ custo, preco, fracionado: false }, config),
+    }
+  })
+
+  return NextResponse.json({ config, avisoFarol, itens: [...itens, ...itensKit] })
 }

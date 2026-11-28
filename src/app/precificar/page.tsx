@@ -16,6 +16,8 @@ const num = (s: string) => { const v = parseFloat(s.replace(/\./g, '').replace('
 interface Item {
   sku: string; nome: string; categoria: string; fracionado: boolean
   custo: number | null; dataUltimaCompra: string | null; fornecedor: string | null
+  /** só kits: o que vai dentro, para conferir o custo */
+  composicao?: string
   preco: number | null; precoAtualizadoEm: string | null; precoMedio30d: number | null
   receita90d: number; receitaMkt90d: number; curva: 'A' | 'B' | 'C' | 'NOVO'
 }
@@ -195,7 +197,10 @@ function PrecificarContent() {
                       <label className="flex items-center gap-1 whitespace-nowrap"><input type="radio" checked={!livreFracionado} onChange={() => setLivreFracionado(false)} /> por unidade</label>
                     </div>
                   ) : (
-                    <p className="text-xs text-tinta-fraca">SKU {item.sku} · {item.fracionado ? 'fracionado (granel)' : 'por unidade'} · curva {item.curva} · vendeu {brl(item.receita90d)} em 90 dias nas lojas e no site</p>
+                    <p className="text-xs text-tinta-fraca">SKU {item.sku} · {item.composicao != null ? 'kit' : item.fracionado ? 'fracionado (granel)' : 'por unidade'} · curva {item.curva} · vendeu {brl(item.receita90d)} em 90 dias nas lojas e no site</p>
+                  )}
+                  {item.composicao && (
+                    <p className="text-xs text-tinta mt-0.5"><span className="font-semibold">Composição:</span> {item.composicao}</p>
                   )}
                 </div>
                 <Sinal s={a.semaforo} />
@@ -210,7 +215,7 @@ function PrecificarContent() {
                 <div className="bg-rdb-50 rounded-xl p-3">
                   <div className="text-[11px] text-tinta-fraca">Custo aplicado</div>
                   <div className="text-lg font-bold text-tinta tabular-nums">{brl(custo)}</div>
-                  <div className="text-[10px] text-tinta-fraca">{num(custoSim) ? 'custo de teste' : item.dataUltimaCompra ? `última compra ${new Date(item.dataUltimaCompra).toLocaleDateString('pt-BR')}` : livre ? 'digite abaixo' : 'sem compra registrada'}</div>
+                  <div className="text-[10px] text-tinta-fraca">{num(custoSim) ? 'custo de teste' : item.composicao != null ? 'soma da composição do kit' : item.dataUltimaCompra ? `última compra ${new Date(item.dataUltimaCompra).toLocaleDateString('pt-BR')}` : livre ? 'digite abaixo' : 'sem compra registrada'}</div>
                 </div>
                 <div className="bg-rdb-50 rounded-xl p-3">
                   <div className="text-[11px] text-tinta-fraca">Preço ideal para {pct(config.meta, 0)} de margem</div>
