@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
-
-async function calcCustoComponente(skuProduto: string, quantidadeGramas?: number, quantidadeUn?: number) {
-  const produto = await db.produto.findUnique({ where: { skuPrincipal: skuProduto } })
-  if (!produto) return null
-  let custo = 0
-  if (quantidadeGramas && produto.custoPorKg) {
-    custo = (produto.custoPorKg * quantidadeGramas) / 1000
-  } else if (quantidadeUn && produto.custoUnitario) {
-    custo = produto.custoUnitario * quantidadeUn
-  } else if (produto.custoAtualizado) {
-    custo = quantidadeGramas
-      ? (produto.custoAtualizado * quantidadeGramas) / 1000
-      : produto.custoAtualizado * (quantidadeUn ?? 1)
-  }
-  return { custo: Math.round(custo * 10000) / 10000, nome: produto.nome }
-}
+import { montarComponentes, numeroForm, respostaErro } from '@/lib/kits'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const kit = await db.kit.findUnique({
@@ -27,47 +12,33 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const b = await req.json()
+  try {
+    const b = await req.json()
+    const { dados, custoTotal } = await montarComponentes(Array.isArray(b.componentes) ? b.componentes : [])
+    const custoEmbalagem = numeroForm(b.custoEmbalagem) ?? 0
 
-  // Recalcular componentes
-  const componentes = b.componentes ?? []
-  let custoTotal = 0
-  const componentesData = []
-
-  for (const comp of componentes) {
-    const info = await calcCustoComponente(comp.skuProduto, comp.quantidadeGramas, comp.quantidadeUn)
-    if (!info) return NextResponse.json({ error: `Produto ${comp.skuProduto} não encontrado` }, { status: 404 })
-    custoTotal += info.custo
-    componentesData.push({
-      skuProduto:       comp.skuProduto,
-      nomeProduto:      info.nome,
-      quantidadeGramas: comp.quantidadeGramas ? parseFloat(comp.quantidadeGramas) : null,
-      quantidadeUn:     comp.quantidadeUn     ? parseFloat(comp.quantidadeUn)     : null,
-      custoUnitario:    info.custo,
+    // troca os componentes e o kit juntos: se algo falhar, nada fica pela metade
+    const kit = await db.$transaction(async tx => {
+      await tx.kitComponente.deleteMany({ where: { kit: { skuKit: params.id } } })
+      return tx.kit.update({
+        where: { skuKit: params.id },
+        data: {
+          nome:           typeof b.nome === 'string' && b.nome.trim() ? b.nome.trim() : undefined,
+          categoria:      b.categoria || 'Kits',
+          custoTotal:     Math.round((custoTotal + custoEmbalagem) * 10000) / 10000,
+          custoEmbalagem,
+          observacoes:    b.observacoes || null,
+          status:         b.status || 'ativo',
+          componentes:    { create: dados },
+        },
+        include: { componentes: true },
+      })
     })
+    return NextResponse.json(kit)
+  } catch (e) {
+    const { status, corpo } = respostaErro(e)
+    return NextResponse.json(corpo, { status })
   }
-
-  const custoEmbalagem = parseFloat(b.custoEmbalagem ?? 0)
-  custoTotal += custoEmbalagem
-
-  // Deletar componentes antigos e recriar
-  await db.kitComponente.deleteMany({ where: { kit: { skuKit: params.id } } })
-
-  const kit = await db.kit.update({
-    where: { skuKit: params.id },
-    data: {
-      nome:           b.nome,
-      categoria:      b.categoria || 'Kits',
-      custoTotal:     Math.round(custoTotal * 10000) / 10000,
-      custoEmbalagem,
-      observacoes:    b.observacoes || null,
-      status:         b.status || 'ativo',
-      componentes:    { create: componentesData },
-    },
-    include: { componentes: true },
-  })
-
-  return NextResponse.json(kit)
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {

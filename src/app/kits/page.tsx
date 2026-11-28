@@ -140,12 +140,22 @@ export default function KitsPage() {
     const url    = editing ? `/api/kits/${editing}` : '/api/kits'
     const method = editing ? 'PUT' : 'POST'
 
-    const r = await fetch(url, {
-      method, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, componentes }),
-    })
-    if (!r.ok) { const d = await r.json(); setError(d.error ?? 'Erro'); setSaving(false); return }
-    setModal(false); load(); setSaving(false)
+    try {
+      const r = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, componentes }),
+      })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        setError(d.error ?? `Não foi possível salvar (erro ${r.status}). Tente de novo.`)
+        return
+      }
+      setModal(false); load()
+    } catch {
+      setError('Sem conexão com o servidor. Confira a internet e tente de novo.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const del = async (skuKit: string) => {

@@ -1,28 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import db from '@/lib/db'
-
-// Calcula o custo de um componente com base no produto cadastrado
-async function calcCustoComponente(skuProduto: string, quantidadeGramas?: number, quantidadeUn?: number): Promise<{ custo: number; nome: string; custoPorKg: number | null } | null> {
-  const produto = await db.produto.findUnique({ where: { skuPrincipal: skuProduto } })
-  if (!produto) return null
-
-  let custo = 0
-  if (quantidadeGramas && produto.custoPorKg) {
-    custo = (produto.custoPorKg * quantidadeGramas) / 1000
-  } else if (quantidadeUn && produto.custoUnitario) {
-    custo = produto.custoUnitario * quantidadeUn
-  } else if (produto.custoAtualizado) {
-    custo = quantidadeGramas
-      ? (produto.custoAtualizado * quantidadeGramas) / 1000
-      : produto.custoAtualizado * (quantidadeUn ?? 1)
-  }
-
-  return {
-    custo: Math.round(custo * 10000) / 10000,
-    nome: produto.nome,
-    custoPorKg: produto.custoPorKg,
-  }
-}
+import { montarComponentes, numeroForm, respostaErro } from '@/lib/kits'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -45,48 +23,33 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const b = await req.json()
+  try {
+    const b = await req.json()
+    const skuKit = typeof b.skuKit === 'string' ? b.skuKit.trim() : ''
+    const nome = typeof b.nome === 'string' ? b.nome.trim() : ''
+    if (!skuKit || !nome) return NextResponse.json({ error: 'SKU e nome são obrigatórios' }, { status: 400 })
 
-  if (!b.skuKit?.trim() || !b.nome?.trim())
-    return NextResponse.json({ error: 'SKU e nome são obrigatórios' }, { status: 400 })
+    const exists = await db.kit.findFirst({ where: { skuKit: { equals: skuKit, mode: 'insensitive' } } })
+    if (exists) return NextResponse.json({ error: `O kit ${exists.skuKit} já está cadastrado. Use o lápis na lista para editar.` }, { status: 409 })
 
-  const exists = await db.kit.findUnique({ where: { skuKit: b.skuKit } })
-  if (exists) return NextResponse.json({ error: 'SKU de kit já cadastrado' }, { status: 409 })
+    const { dados, custoTotal } = await montarComponentes(Array.isArray(b.componentes) ? b.componentes : [])
+    const custoEmbalagem = numeroForm(b.custoEmbalagem) ?? 0
 
-  // Calcular custo de cada componente
-  const componentes = b.componentes ?? []
-  let custoTotal = 0
-  const componentesData = []
-
-  for (const comp of componentes) {
-    const info = await calcCustoComponente(comp.skuProduto, comp.quantidadeGramas, comp.quantidadeUn)
-    if (!info) return NextResponse.json({ error: `Produto ${comp.skuProduto} não encontrado` }, { status: 404 })
-    custoTotal += info.custo
-    componentesData.push({
-      skuProduto:       comp.skuProduto,
-      nomeProduto:      info.nome,
-      quantidadeGramas: comp.quantidadeGramas ? parseFloat(comp.quantidadeGramas) : null,
-      quantidadeUn:     comp.quantidadeUn     ? parseFloat(comp.quantidadeUn)     : null,
-      custoUnitario:    info.custo,
+    const kit = await db.kit.create({
+      data: {
+        skuKit, nome,
+        categoria:      b.categoria || 'Kits',
+        custoTotal:     Math.round((custoTotal + custoEmbalagem) * 10000) / 10000,
+        custoEmbalagem,
+        observacoes:    b.observacoes || null,
+        status:         b.status || 'ativo',
+        componentes:    { create: dados },
+      },
+      include: { componentes: true },
     })
+    return NextResponse.json(kit, { status: 201 })
+  } catch (e) {
+    const { status, corpo } = respostaErro(e)
+    return NextResponse.json(corpo, { status })
   }
-
-  const custoEmbalagem = parseFloat(b.custoEmbalagem ?? 0)
-  custoTotal += custoEmbalagem
-
-  const kit = await db.kit.create({
-    data: {
-      skuKit:         b.skuKit.trim(),
-      nome:           b.nome.trim(),
-      categoria:      b.categoria || 'Kits',
-      custoTotal:     Math.round(custoTotal * 10000) / 10000,
-      custoEmbalagem,
-      observacoes:    b.observacoes || null,
-      status:         b.status || 'ativo',
-      componentes:    { create: componentesData },
-    },
-    include: { componentes: true },
-  })
-
-  return NextResponse.json(kit, { status: 201 })
 }
